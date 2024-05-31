@@ -17,26 +17,18 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         arch: [amd64, arm64]
-    runs-on: ${{ matrix.os }}
+    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v1.4.0
+    with:
+      go-version: 1.17
+      config-file: .slsa-goreleaser.yml
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.17
 
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/golang@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-
-      - name: Build and generate provenance
-        uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v1.4.0
-        with:
-          go-version: 1.17
-          config-file: .slsa-goreleaser.yml
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3

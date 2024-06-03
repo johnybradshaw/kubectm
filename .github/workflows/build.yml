@@ -75,9 +75,19 @@ jobs:
           arch:
             - amd64
             - arm64
-      uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
-      with:
-        go-version-file: './go.mod' # Use the go.mod file
-        upload-assets: true # Upload assets to release
-        config-file: .slsa-goreleaser/${{matrix.os}}-${{matrix.arch}}.yml
-        evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}"
+      runs-on: ${{ matrix.os }}-latest # OS to run on
+      steps:
+        # SLSA Generator - Build and upload SLSA provenance
+        # https://github.com/slsa-framework/slsa-github-generator
+        - name: SLSA Generator
+          uses: ./.github/actions/builder_go_slsa3.yml # Use the local SLSA Generator
+          with:
+            go-version-file: './go.mod' # Use the go.mod file
+            upload-assets: true # Upload assets to release
+            config-file: .slsa-goreleaser/${{matrix.os}}-${{matrix.arch}}.yml
+            evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}"
+        # Attest Build Provenance
+        - name: Attest Build Provenance
+          uses: actions/attest-build-provenance@v1
+          with:
+            subject-path: '${{ github.workspace }}/dist'

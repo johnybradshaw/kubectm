@@ -1,5 +1,7 @@
 # acc-kubeconfig-cli
 
+[![CodeQL](https://github.com/johnybradshaw/acc-kubeconfig-cli/actions/workflows/codeql.yml/badge.svg)](https://github.com/johnybradshaw/acc-kubeconfig-cli/actions/workflows/codeql.yml)
+
 ## Overview
 
 This CLI is used to manage access to Kubernetes clusters using [kubectl](https://kubernetes.io/docs/reference/kubectl/) by exporting and integrating `kubeconfig` files for your [Akamai Connected Cloud (Linode)](https://www.akamai.com/cloud/) Kubernetes clusters into your `~/.kube/config`.

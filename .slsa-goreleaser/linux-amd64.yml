@@ -1,3 +1,16 @@
-env:
-  - GOOS=linux
-  - GOARCH=amd64
+version: 1.0.0
+builds:
+  - env:
+      - GOOS=linux
+      - GOARCH=amd64
+    goos:
+      - linux
+    goarch:
+      - amd64
+    main: ./cmd/lke-kubeconfigconfig/main.go
+    ldflags: -s -w
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - go-compiled-binary

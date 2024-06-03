@@ -1,3 +1,17 @@
-env:
-  - GOOS=windows
-  - GOARCH=arm64
+version: 1.0.0
+builds:
+  - env:
+      - GOOS=windows
+      - GOARCH=amd64
+    goos:
+      - windows
+    goarch:
+      - amd64
+    main: ./cmd/lke-kubeconfigconfig/main.go
+    ldflags: -s -w
+
+archives:
+  - format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - go-compiled-binary

@@ -2,28 +2,32 @@ name: Build & Publish
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
-permissions: read-all
+permissions:
+  id-token: write  # To sign the provenance.
+  contents: write  # To upload assets to release.
+  actions: read  # To read the workflow path.
 
 jobs:
   build:
-      permissions:
-        id-token: write # To sign the provenance.
-        contents: write # To upload assets to release.
-        actions: read # To read the workflow path.
-      strategy:
-        matrix:
-          os:
-            - linux
-            - windows
-            - darwin
-          arch:
-            - amd64
-            - arm64
-      uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
-      with:
-        go-version: 1.22
-        config-file: .slsa-goreleaser/${{matrix.os}}-${{matrix.arch}}.yml
+    runs-on: ${{ matrix.os }}  # Ensure this uses the correct matrix variable
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]  # Use specific runners
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.22
+      
+      - name: Build with SLSA
+        uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
+        with:
+          config-file: .slsa-goreleaser/${{ matrix.os }}-${{ matrix.arch }}.yml

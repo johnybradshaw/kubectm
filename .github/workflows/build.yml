@@ -3,6 +3,8 @@ name: Build & Publish
 on:
   push:
     branches: [ "main" ]
+    tags:
+      - '*'
     paths:
       - "**.go"
       - ".github/workflows/build.yml"

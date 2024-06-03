@@ -11,6 +11,10 @@ flags:
   - -trimpath
   - -tags=netgo
 
+tags:
+    - "macOS_ARM64"
+    - "latest"
+
 # The OS to compile for. `GOOS` env variable will be set to this value.
 goos: darwin
 

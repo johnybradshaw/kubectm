@@ -21,12 +21,13 @@ jobs:
         uses: snyk/actions/golang@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-            args: --sarif-file-output=snyk.sarif
-      - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: snyk.sarif
+      # Uncomment the following step to upload the result to GitHub Code Scanning
+          #   with:
+      #       args: --sarif-file-output=snyk.sarif
+      # - name: Upload result to GitHub Code Scanning
+      #   uses: github/codeql-action/upload-sarif@v2
+      #   with:
+      #     sarif_file: snyk.sarif
 
   args:
     runs-on: ubuntu-latest

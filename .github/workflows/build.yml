@@ -79,15 +79,3 @@ jobs:
         upload-assets: true # Upload assets to release
         config-file: .slsa-goreleaser/${{matrix.os}}-${{matrix.arch}}.yml
         evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}"
-
-  attestation:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-      id-token: write
-    steps:
-      - name: Attest Build Provenance
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: '${{ github.workspace }}/dist'

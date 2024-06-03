@@ -1,58 +1,3 @@
-# name: SLSA go releaser
-# on:
-#   workflow_dispatch:
-#   push:
-#     tags:
-#       - "*"
-
-# permissions: read-all
-
-# jobs:
-#   # Generate ldflags dynamically.
-#   # Optional: only needed for ldflags.
-#   args:
-#     runs-on: ubuntu-latest
-#     outputs:
-#       commit-date: ${{ steps.ldflags.outputs.commit-date }}
-#       commit: ${{ steps.ldflags.outputs.commit }}
-#       version: ${{ steps.ldflags.outputs.version }}
-#       tree-state: ${{ steps.ldflags.outputs.tree-state }}
-#     steps:
-#       - id: checkout
-#         uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # tag=v2.3.4
-#         with:
-#           fetch-depth: 0
-#       - id: ldflags
-#         run: |
-#           echo "commit-date=$(git log --date=iso8601-strict -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
-#           echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-#           echo "version=$(git describe --tags --always --dirty | cut -c2-)" >> "$GITHUB_OUTPUT"
-#           echo "tree-state=$(if git diff --quiet; then echo "clean"; else echo "dirty"; fi)" >> "$GITHUB_OUTPUT"
-
-#   # Trusted builder.
-#   build:
-#     permissions:
-#       id-token: write # To sign the provenance.
-#       contents: write # To upload assets to release.
-#       actions: read # To read the workflow path.
-#     needs: args
-#     uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
-#     with:
-#       go-version: 1.22
-#       config-file: .slsa-goreleaser2.yml
-#       # Optional: only needed if using ldflags.
-#       evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}"
-
-#   # upload:
-#   #   runs-on: ubuntu-latest
-#   #   needs: build
-#   #   steps:
-#   #     - name: Publish
-#   #       uses: actions/upload-artifact@v4
-#   #       with:
-#   #         name: acc-kubeconfig-cli
-#   #         path: go-binary-name
-
 name: SLSA go releaser
 on:
   workflow_dispatch:
@@ -74,7 +19,7 @@ jobs:
       tree-state: ${{ steps.ldflags.outputs.tree-state }}
     steps:
       - id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # tag=v2.3.4
         with:
           fetch-depth: 0
       - id: ldflags
@@ -94,5 +39,27 @@ jobs:
     uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
     with:
       go-version: 1.22
+      upload-assets: true
+      config-file: .slsa-goreleaser2.yml
       # Optional: only needed if using ldflags.
       evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}"
+
+
+  # publish:
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: acc-kubeconfig-cli
+  #         path: ${{ needs.build.outputs.binary-path }}
+
+  # upload:
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - name: Publish
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: acc-kubeconfig-cli
+  #         path: go-binary-name

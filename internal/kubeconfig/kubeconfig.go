@@ -1,23 +1,24 @@
-package main
+package kubeconfig
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
+    "fmt"
+    "os"
+    "os/exec"
+    "path/filepath"
 
-	"gopkg.in/yaml.v2"
+    "github.com/johnybradshaw/acc-kubeconfig-cli/internal/constants" // Import the constants package
+    "gopkg.in/yaml.v2"
 )
 
-func createKubeDirectory() {
+func CreateKubeDirectory() {
 	err := os.MkdirAll(filepath.Join(os.Getenv("HOME"), ".kube"), os.ModePerm)
 	if err != nil {
-		fmt.Printf("%sError:%s Failed to create .kube directory: %v\n", colorRed, colorReset, err)
+		fmt.Printf("%sError:%s Failed to create .kube directory: %v\n", constants.ColorRed, constants.ColorReset, err)
 		os.Exit(1)
 	}
 }
 
-func initializeKubeconfigFile() string {
+func InitializeKubeconfigFile() string {
 	kubeconfigPath := filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	if _, err := os.Stat(kubeconfigPath); os.IsNotExist(err) {
 		err := os.WriteFile(kubeconfigPath, []byte(`apiVersion: v1
@@ -27,14 +28,14 @@ contexts: []
 users: []
 current-context: ""`), os.ModePerm)
 		if err != nil {
-			fmt.Printf("%sError:%s Failed to create empty kubeconfig file: %v\n", colorRed, colorReset, err)
+			fmt.Printf("%sError:%s Failed to create empty kubeconfig file: %v\n", constants.ColorRed, constants.ColorReset, err)
 			os.Exit(1)
 		}
 	}
 	return kubeconfigPath
 }
 
-func updateContextName(kubeconfigPath, oldContextName, newContextName string) error {
+func UpdateContextName(kubeconfigPath, oldContextName, newContextName string) error {
 	data, err := os.ReadFile(kubeconfigPath)
 	if err != nil {
 		return err
@@ -73,7 +74,7 @@ func updateContextName(kubeconfigPath, oldContextName, newContextName string) er
 	return nil
 }
 
-func mergeKubeconfigs(kubeconfig string, kubeconfigPath string) error {
+func MergeKubeconfigs(kubeconfig string, kubeconfigPath string) error {
 	cmd := exec.Command("kubectl", "config", "view", "--flatten")
 	cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%s", kubeconfig))
 	mergedKubeconfig, err := cmd.Output()

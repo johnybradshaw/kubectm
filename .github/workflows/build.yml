@@ -3,6 +3,8 @@ name: Build & Publish
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - "**.go"
   pull_request:
     branches: [ "main" ]
 

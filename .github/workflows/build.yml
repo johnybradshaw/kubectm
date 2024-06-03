@@ -1,34 +1,11 @@
-name: Build & Publish
-
+name: SLSA go releaser
 on:
+  workflow_dispatch:
   push:
-    branches: ["main"]
-    paths: # Only build on changes to these files
-      # Go files
-      - go.mod
-      - go.sum
-      - *.go
-      # Workflow files
-      - .github/workflows/build.yml
-      - .slsa-goreleaser/**
+    tags:
+      - "*"
 
-  pull_request:
-    branches: ["main"]
-    paths: # Only build on changes to these files
-      # Go files
-      - go.mod
-      - go.sum
-      - cmd/**
-      - pkg/**
-      - internal/**
-      # Workflow files
-      - .github/workflows/build.yml
-      - .slsa-goreleaser/**
-
-permissions:
-  id-token: write  # To sign the provenance.
-  contents: write  # To upload assets to release.
-  actions: read  # To read the workflow path.
+permissions: read-all
 
 jobs:
   # Generate ldflags dynamically.
@@ -40,44 +17,20 @@ jobs:
       commit: ${{ steps.ldflags.outputs.commit }}
       version: ${{ steps.ldflags.outputs.version }}
       tree-state: ${{ steps.ldflags.outputs.tree-state }}
-      version-package: github.com/sigstore/k8s-manifest-sigstore/pkg/util
     steps:
       - id: checkout
-        uses: actions/checkout@v2
-
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # tag=v2.3.4
+        with:
+          fetch-depth: 0
       - id: ldflags
         run: |
-          echo "::set-output name=commit-date::$(git log --date=iso8601-strict -1 --pretty=%ct)"
-          echo "::set-output name=commit::$GITHUB_SHA"
-          echo "::set-output name=version::$(git describe --tags --always --dirty | cut -c2-)"
-          echo "::set-output name=tree-state::$(if git diff --quiet; then echo "clean"; else echo "dirty"; fi)"
+          echo "commit-date=$(git log --date=iso8601-strict -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
+          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "version=$(git describe --tags --always --dirty | cut -c2-)" >> "$GITHUB_OUTPUT"
+          echo "tree-state=$(if git diff --quiet; then echo "clean"; else echo "dirty"; fi)" >> "$GITHUB_OUTPUT"
 
   # Trusted builder.
-  # build-linux-amd64:
-  #   permissions:
-  #     id-token: write # To sign the provenance.
-  #     contents: write # To upload assets to release.
-  #     actions: read # To read the workflow path.
-  #   needs: args
-  #   uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
-  #   with:
-  #     config-file: .slsa-goreleaser/linux-amd64.yml
-  #     go-version: 1.22
-  #     evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}, VERSION_PKG:${{needs.args.outputs.version-package}}"
-      
-  # build-darwin-amd64:
-  #   permissions:
-  #     id-token: write # To sign the provenance.
-  #     contents: write # To upload assets to release.
-  #     actions: read # To read the workflow path.
-  #   needs: args
-  #   uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
-  #   with:
-  #     config-file: .slsa-goreleaser/darwin-amd64.yml
-  #     go-version: 1.22
-  #     evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}, VERSION_PKG:${{needs.args.outputs.version-package}}"
-      
-  build-darwin-arm64:
+  build:
     permissions:
       id-token: write # To sign the provenance.
       contents: write # To upload assets to release.
@@ -85,20 +38,17 @@ jobs:
     needs: args
     uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
     with:
-      upload-assets: true
-      config-file: .slsa-goreleaser/darwin-arm64.yml
       go-version: 1.22
-      evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}, VERSION_PKG:${{needs.args.outputs.version-package}}"
+      config-file: .slsa-goreleaser2.yml
+      # Optional: only needed if using ldflags.
+      evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}"
 
-  # build-windows-amd64:
-  #   permissions:
-  #     id-token: write # To sign the provenance.
-  #     contents: write # To upload assets to release.
-  #     actions: read # To read the workflow path.
-  #   needs: args
-  #   uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
-  #   with:
-  #     config-file: .slsa-goreleaser/windows-amd64.yml
-  #     go-version: 1.22
-  #     evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}, VERSION_PKG:${{needs.args.outputs.version-package}}"
-  
+  # upload:
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - name: Publish
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: acc-kubeconfig-cli
+  #         path: go-binary-name

@@ -1,18 +1,36 @@
-version: 1.0.0
+# Version for this file.
+version: 1
 
-builds:
-  - env:
-      - GOOS=darwin
-      - GOARCH=arm64
-    goos:
-      - darwin
-    goarch:
-      - arm64
-    main: ./cmd/lke-kubeconfigconfig/main.go
-    ldflags: -s -w
+# (Optional) List of env variables used during compilation.
+env:
+  - GO111MODULE=on
+  - CGO_ENABLED=0
 
-archives:
-  - format: tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    files:
-      - go-compiled-binary
+# (Optional) Flags for the compiler.
+flags:
+  - -trimpath
+  - -tags=netgo
+
+# The OS to compile for. `GOOS` env variable will be set to this value.
+goos: darwin
+
+# The architecture to compile for. `GOARCH` env variable will be set to this value.
+goarch: arm64
+
+# (Optional) Entrypoint to compile.
+main: ./cmd/lke-kubeconfigconfig
+
+# (Optional) Working directory. (default: root of the project)
+# dir: ./relative/path/to/dir
+
+# Binary output name.
+# {{ .Os }} will be replaced by goos field in the config file.
+# {{ .Arch }} will be replaced by goarch field in the config file.
+binary: acc-kubeconfig-cli-{{ .Os }}-{{ .Arch }}
+
+# (Optional) ldflags generated dynamically in the workflow, and set as the `evaluated-envs` input variables in the workflow.
+ldflags:
+  - "-X '{{ .Env.VERSION_PKG }}.GitVersion={{ .Env.VERSION }}'"
+  - "-X '{{ .Env.VERSION_PKG }}.gitCommit={{ .Env.COMMIT }}'"
+  - "-X '{{ .Env.VERSION_PKG }}.buildDate={{ .Env.COMMIT_DATE }}'"
+  - "-X '{{ .Env.VERSION_PKG }}.gitTreeState={{ .Env.TREE_STATE }}'"

@@ -5,8 +5,10 @@ on:
     branches: [ "main" ]
     paths:
       - "**.go"
+      - ".github/workflows/build.yml"
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main" ] # Only run on pull requests to main
+  workflow_dispatch: # Triggered manually
 
 permissions: read-all
 

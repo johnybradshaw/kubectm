@@ -3,8 +3,27 @@ name: Build & Publish
 on:
   push:
     branches: ["main"]
+    paths: # Only build on changes to these files
+      # Go files
+      - go.mod
+      - go.sum
+      - *.go
+      # Workflow files
+      - .github/workflows/build.yml
+      - .slsa-goreleaser/**
+
   pull_request:
     branches: ["main"]
+    paths: # Only build on changes to these files
+      # Go files
+      - go.mod
+      - go.sum
+      - cmd/**
+      - pkg/**
+      - internal/**
+      # Workflow files
+      - .github/workflows/build.yml
+      - .slsa-goreleaser/**
 
 permissions:
   id-token: write  # To sign the provenance.
@@ -66,10 +85,11 @@ jobs:
     needs: args
     uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
     with:
+      upload-assets: true
       config-file: .slsa-goreleaser/darwin-arm64.yml
       go-version: 1.22
       evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}, VERSION_PKG:${{needs.args.outputs.version-package}}"
-      
+
   # build-windows-amd64:
   #   permissions:
   #     id-token: write # To sign the provenance.

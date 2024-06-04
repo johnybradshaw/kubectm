@@ -1,4 +1,7 @@
 name: Build & Publish
+env:
+  tag: ${{github.ref_name}}
+  binary_name: acc-kubeconfig-cli
 
 on:
   push:
@@ -39,6 +42,7 @@ jobs:
       commit: ${{ steps.ldflags.outputs.commit }}
       version: ${{ steps.ldflags.outputs.version }}
       tree-state: ${{ steps.ldflags.outputs.tree-state }}
+      binary-name: ${{ env.binary_name }}
     steps:
       - id: checkout # Checkout
         uses: actions/checkout@v4 
@@ -79,6 +83,6 @@ jobs:
       with:
         go-version-file: './go.mod' # Use the go.mod file
         upload-assets: true # Upload assets to release
-        # upload-tag-name: ${{matrix.os}}-${{matrix.arch}}
-        config-file: .slsa-goreleaser/${{matrix.os}}-${{matrix.arch}}.yml
-        evaluated-envs: "COMMIT_DATE:${{needs.args.outputs.commit-date}}, COMMIT:${{needs.args.outputs.commit}}, VERSION:${{needs.args.outputs.version}}, TREE_STATE:${{needs.args.outputs.tree-state}}"
+        upload-tag-name: ${{ github.ref_name }}
+        config-file: .slsa-goreleaser/${{ matrix.os }}-${{ matrix.arch }}.yml
+        evaluated-envs: "BINARY_NAME:${{ needs.args.outputs.binary-name }},COMMIT_DATE:${{ needs.args.outputs.commit-date }}, COMMIT:${{ needs.args.outputs.commit }}, VERSION:${{ needs.args.outputs.version }}, TREE_STATE:${{ needs.args.outputs.tree-state }}"

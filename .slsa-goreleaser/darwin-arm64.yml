@@ -31,7 +31,7 @@ main: ./cmd/lke-kubeconfigconfig
 # Binary output name.
 # {{ .Os }} will be replaced by goos field in the config file.
 # {{ .Arch }} will be replaced by goarch field in the config file.
-binary: acc-kubeconfig-cli-{{ .Os }}-{{ .Arch }}
+binary: "{{ .Env.BINARY_NAME }}-{{ .Os }}-{{ .Arch }}"
 
 # (Optional) ldflags generated dynamically in the workflow, and set as the `evaluated-envs` input variables in the workflow.
 ldflags:

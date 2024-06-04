@@ -4,11 +4,11 @@
 
 ## Overview
 
-This CLI is used to manage access to Kubernetes clusters using [kubectl](https://kubernetes.io/docs/reference/kubectl/) by exporting and integrating `kubeconfig` files for your [Akamai Connected Cloud (Linode)](https://www.akamai.com/cloud/) Kubernetes clusters into your `~/.kube/config`.
+This CLI app will merge your `kubeconfig`s from all [Linode Kubernetes Engine (LKE)](https://www.linode.com/products/kubernetes/?utm_medium=website&utm_source=github-johnybradshaw) clusters into your `~/.kube/config`. It will either use your credentials stored in the `linode-cli` config file or the `LINODE_API_TOKEN` environment variable to authenticate with the Linode API.
 
 ## Usage
 
-The `acc-kubeconfig-cli` requires you to have already set your Linode API token in the environment variable `LINODE_API_TOKEN`.
+The `acc-kubeconfig-cli` requires you to have already set your Linode API token in the environment variable `LINODE_API_TOKEN` or your `linode-cli` config file.
 
 To get started, run the following command:
 
@@ -36,7 +36,7 @@ Options:
   --help    Display this help information
 
 Environment Variables:
-  LINODE_API_TOKEN   Linode API token for authentication
+  LINODE_API_TOKEN   Linode API token for authentication (optional)
 
 For more information and source code, visit:
 https://github.com/johnybradshaw/acc-kubeconfig-cli
@@ -47,5 +47,5 @@ https://github.com/johnybradshaw/acc-kubeconfig-cli
 To build the binary, run the following command:
 
 ```bash
-go build -o acc-kubeconfig-cli
+go build ./cmd/lke-kubeconfigconfig
 ```

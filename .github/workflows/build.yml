@@ -36,6 +36,8 @@ jobs:
       #     sarif_file: snyk.sarif
 
   args:
+    if: startsWith(github.ref, 'refs/tags/v') && github.ref_name == 'main' # Only run on meaningful update
+    
     runs-on: ubuntu-latest
     needs: security # Depends on the security job, don't run until it's done.
     outputs:
@@ -65,6 +67,7 @@ jobs:
           echo "tree-state=$(if git diff --quiet; then echo "clean"; else echo "dirty"; fi)" >> "$GITHUB_OUTPUT"
 
   build:
+      if: startsWith(github.ref, 'refs/tags/v') && github.ref_name == 'main' # Only run on meaningful update
       permissions:
         id-token: write # To sign the provenance.
         contents: write # To upload assets to release.
@@ -87,3 +90,4 @@ jobs:
         upload-tag-name: ${{ github.ref_name }}
         config-file: .slsa-goreleaser/${{ matrix.os }}-${{ matrix.arch }}.yml
         evaluated-envs: "BINARY_NAME:${{ needs.args.outputs.binary-name }},COMMIT_DATE:${{ needs.args.outputs.commit-date }}, COMMIT:${{ needs.args.outputs.commit }}, VERSION:${{ needs.args.outputs.version }}, TREE_STATE:${{ needs.args.outputs.tree-state }}"
+

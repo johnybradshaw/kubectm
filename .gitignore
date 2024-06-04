@@ -22,3 +22,4 @@ go.work
 go.work.sum
 .slsa-goreleaser2
 acc-kubeconfig-cli
+lke-kubeconfigconfig

@@ -1,15 +1,19 @@
 package kubeconfig
 
 import (
-    "fmt"
-    "os"
-    "os/exec"
-    "path/filepath"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 
-    "github.com/johnybradshaw/acc-kubeconfig-cli/internal/constants" // Import the constants package
-    "gopkg.in/yaml.v2"
+	"github.com/johnybradshaw/acc-kubeconfig-cli/internal/constants" // Import the constants package
+	"gopkg.in/yaml.v2"
 )
 
+// CreateKubeDirectory creates the .kube directory in the user's home directory.
+//
+// This function does not take any parameters.
+// It returns an error if there was a problem creating the directory.
 func CreateKubeDirectory() {
 	err := os.MkdirAll(filepath.Join(os.Getenv("HOME"), ".kube"), os.ModePerm)
 	if err != nil {
@@ -18,6 +22,10 @@ func CreateKubeDirectory() {
 	}
 }
 
+// InitializeKubeconfigFile initializes the kubeconfig file if it does not exist.
+//
+// This function does not take any parameters.
+// It returns a string representing the path of the kubeconfig file.
 func InitializeKubeconfigFile() string {
 	kubeconfigPath := filepath.Join(os.Getenv("HOME"), ".kube", "config")
 	if _, err := os.Stat(kubeconfigPath); os.IsNotExist(err) {
@@ -35,6 +43,15 @@ current-context: ""`), os.ModePerm)
 	return kubeconfigPath
 }
 
+// UpdateContextName updates the name of a context in the given kubeconfig file.
+//
+// Parameters:
+// - kubeconfigPath: The path to the kubeconfig file.
+// - oldContextName: The current name of the context to be updated.
+// - newContextName: The new name to be assigned to the context.
+//
+// Returns:
+// - error: An error if there was a problem reading or writing the kubeconfig file, or if the context was not found.
 func UpdateContextName(kubeconfigPath, oldContextName, newContextName string) error {
 	data, err := os.ReadFile(kubeconfigPath)
 	if err != nil {
@@ -74,6 +91,14 @@ func UpdateContextName(kubeconfigPath, oldContextName, newContextName string) er
 	return nil
 }
 
+// MergeKubeconfigs merges the given kubeconfig with the existing kubeconfig file.
+//
+// Parameters:
+// - kubeconfig: The content of the kubeconfig to be merged.
+// - kubeconfigPath: The path to the existing kubeconfig file.
+//
+// Returns:
+// - error: An error if there was a problem merging the kubeconfigs or writing the merged kubeconfig to the file.
 func MergeKubeconfigs(kubeconfig string, kubeconfigPath string) error {
 	cmd := exec.Command("kubectl", "config", "view", "--flatten")
 	cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%s", kubeconfig))

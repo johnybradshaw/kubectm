@@ -14,10 +14,17 @@ import (
 
 	// Import local packages
 	"github.com/johnybradshaw/acc-kubeconfig-cli/internal/constants"
-    "github.com/johnybradshaw/acc-kubeconfig-cli/pkg/utils"
 	kc "github.com/johnybradshaw/acc-kubeconfig-cli/internal/kubeconfig"
+	"github.com/johnybradshaw/acc-kubeconfig-cli/pkg/utils"
 )
 
+// CreateLinodeClient creates a Linode client using the provided API token.
+//
+// Parameters:
+// - apiToken: The API token used to authenticate with the Linode API.
+//
+// Returns:
+// - linodego.Client: The Linode client instance.
 func CreateLinodeClient(apiToken string) linodego.Client {
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: apiToken})
 	oauth2Client := &http.Client{
@@ -28,6 +35,14 @@ func CreateLinodeClient(apiToken string) linodego.Client {
 	return linodego.NewClient(oauth2Client)
 }
 
+// GetClusters retrieves a list of LKECluster objects from the Linode API.
+//
+// Parameters:
+// - linodeClient: The Linode client instance used to make the API request.
+//
+// Returns:
+// - []linodego.LKECluster: A slice of LKECluster objects representing the clusters retrieved from the API.
+// - error: An error if the API request fails.
 func GetClusters(linodeClient linodego.Client) ([]linodego.LKECluster, error) {
 	clusters, err := linodeClient.ListLKEClusters(context.Background(), nil)
 	if err != nil {
@@ -36,6 +51,16 @@ func GetClusters(linodeClient linodego.Client) ([]linodego.LKECluster, error) {
 	return clusters, nil
 }
 
+// ProcessClusterKubeconfigs processes the kubeconfigs for each cluster and merges them into a single kubeconfig file.
+//
+// Parameters:
+// - linodeClient: The Linode client instance used to retrieve cluster details and kubeconfigs.
+// - clusters: The list of LKECluster objects representing the clusters to process.
+// - kubeconfigPath: The path to the existing kubeconfig file.
+// - debugMode: A boolean indicating whether debug mode is enabled.
+//
+// Returns:
+// - error: An error if any of the API requests or file operations fail.
 func ProcessClusterKubeconfigs(linodeClient linodego.Client, clusters []linodego.LKECluster, kubeconfigPath string, debugMode bool) error {
 	// Initialize the KUBECONFIG variable with the existing kubeconfig file
 	kubeconfig := kubeconfigPath
@@ -103,6 +128,14 @@ func ProcessClusterKubeconfigs(linodeClient linodego.Client, clusters []linodego
 	return nil
 }
 
+// isContextExists checks if a context with the given name exists in the kubeconfig file.
+//
+// Parameters:
+// - kubeconfigPath: The path to the kubeconfig file.
+// - contextName: The name of the context to check.
+//
+// Returns:
+// - bool: True if the context exists, false otherwise.
 func isContextExists(kubeconfigPath, contextName string) bool {
 	data, err := os.ReadFile(kubeconfigPath)
 	if err != nil {

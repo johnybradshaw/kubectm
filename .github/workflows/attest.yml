@@ -15,10 +15,16 @@ jobs:
       attestations: write
       id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # - name: Checkout
+      #   uses: actions/checkout@v4
 
-      - name: Attest
-        uses: actions/attest-build-provenance@v1
+      - uses: actions/download-artifact@v4
         with:
-          subject-path: './'
+          name: my-artifact
+      - name: Display structure of downloaded files
+        run: ls -R
+
+      # - name: Attest
+      #   uses: actions/attest-build-provenance@v1
+      #   with:
+      #     subject-path: './'

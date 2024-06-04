@@ -1,0 +1,24 @@
+name: Attestation
+
+on:
+    release:
+        types: [published]
+    workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Attest
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'dist/**'

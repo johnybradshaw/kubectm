@@ -3,7 +3,7 @@ module github.com/johnybradshaw/acc-kubeconfig-cli
 go 1.22.3
 
 require (
-	github.com/linode/linodego v1.34.0
+	github.com/linode/linodego v1.35.0
 	golang.org/x/oauth2 v0.20.0
 	gopkg.in/yaml.v2 v2.4.0
 )

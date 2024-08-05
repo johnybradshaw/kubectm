@@ -4,7 +4,7 @@ go 1.22.3
 
 require (
 	github.com/linode/linodego v1.36.1
-	golang.org/x/oauth2 v0.21.0
+	golang.org/x/oauth2 v0.22.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 

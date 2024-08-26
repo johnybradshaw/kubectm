@@ -16,10 +16,12 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+.DS_Store
+**/.DS_Store
 
 # Go workspace file
 go.work
 go.work.sum
 .slsa-goreleaser2
-acc-kubeconfig-cli
-lke-kubeconfigconfig
+kubectm
+.DS_Store

@@ -3,17 +3,20 @@ package credentials
 import (
     "bufio"
     "fmt"
-    "log"
+    "kubectm/pkg/utils" // Import your utils package for logging
     "os"
     "path/filepath"
     "strings"
-    "io/ioutil"
 )
 
+// retrieveLinodeCredentials retrieves Linode credentials
 func retrieveLinodeCredentials() (*Credential, error) {
-    // First, try to retrieve the access token from environment variables
     accessToken := os.Getenv("LINODE_ACCESS_TOKEN")
     if accessToken != "" {
+        obfuscatedToken := utils.ObfuscateCredential(accessToken)
+        utils.InfoLogger.Printf("%s Linode credentials found: %v", utils.Iso8601Time(), map[string]string{
+            "AccessToken": obfuscatedToken,
+        })
         return &Credential{
             Provider: "Linode",
             Details: map[string]string{
@@ -22,35 +25,34 @@ func retrieveLinodeCredentials() (*Credential, error) {
         }, nil
     }
 
-    // Correct path: ~/.config/linode-cli
     configDirPath := filepath.Join(os.Getenv("HOME"), ".config", "linode-cli")
-    log.Printf("Looking for Linode config in directory: %s", configDirPath)
+    utils.InfoLogger.Printf("%s Looking for Linode config in directory: %s", utils.Iso8601Time(), configDirPath)
 
-    // Check if the directory exists
     _, err := os.Stat(configDirPath)
     if os.IsNotExist(err) {
-        log.Printf("Linode config directory not found: %v", err)
+        utils.WarnLogger.Printf("%s Linode config directory not found: %v", utils.Iso8601Time(), err)
         return nil, fmt.Errorf("linode config directory not found")
     }
 
-    // Load and parse the credentials from the directory content
-    configFileContent, err := ioutil.ReadFile(configDirPath)
+    configFileContent, err := os.ReadFile(configDirPath)
     if err != nil {
-        log.Printf("Error reading Linode config directory: %v", err)
+        utils.ErrorLogger.Printf("%s Error reading Linode config directory: %v", utils.Iso8601Time(), err)
         return nil, fmt.Errorf("error reading Linode config")
     }
 
-    // Find the default profile from the config file content
     defaultProfile := getDefaultProfile(configFileContent)
-    log.Printf("Default profile found: %s", defaultProfile)
+    utils.InfoLogger.Printf("%s Default profile found: %s", utils.Iso8601Time(), defaultProfile)
     if defaultProfile == "" {
         return nil, fmt.Errorf("no default profile found in Linode config")
     }
 
-    // Parse the config file content to extract the access token from the default profile
     accessToken = parseLinodeConfig(configFileContent, defaultProfile)
     if accessToken != "" {
-        log.Printf("Access token found: %s", accessToken)
+        obfuscatedToken := utils.ObfuscateCredential(accessToken)
+        //utils.InfoLogger.Printf("%s Access token found: %s", utils.Iso8601Time(), obfuscatedToken)
+        utils.InfoLogger.Printf("%s Linode credentials found: %v", utils.Iso8601Time(), map[string]string{
+            "AccessToken": obfuscatedToken,
+        })
         return &Credential{
             Provider: "Linode",
             Details: map[string]string{
@@ -59,8 +61,38 @@ func retrieveLinodeCredentials() (*Credential, error) {
         }, nil
     }
 
-    // If credentials are still not found, return an error
     return nil, fmt.Errorf("linode credentials not found")
+}
+
+// parseLinodeConfig extracts the access token from the specified profile section
+func parseLinodeConfig(configContent []byte, profile string) string {
+    scanner := bufio.NewScanner(strings.NewReader(string(configContent)))
+    inSection := false
+    sectionHeader := fmt.Sprintf("[%s]", profile)
+    for scanner.Scan() {
+        line := strings.TrimSpace(scanner.Text())
+        if line == sectionHeader {
+            utils.InfoLogger.Printf("%s Entering section: %s", utils.Iso8601Time(), profile)
+            inSection = true
+            continue
+        } else if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+            utils.InfoLogger.Printf("%s Exiting section: %s", utils.Iso8601Time(), profile)
+            inSection = false
+        }
+
+        if inSection && strings.HasPrefix(line, "token") {
+            parts := strings.Split(line, "=")
+            if len(parts) == 2 {
+                token := strings.TrimSpace(parts[1])
+                obfuscatedToken := utils.ObfuscateCredential(token)
+                utils.InfoLogger.Printf("%s Access token found: %s", utils.Iso8601Time(), obfuscatedToken)
+                return token
+            }
+        } else {
+            utils.InfoLogger.Printf("%s Parsing non-sensitive line: %s", utils.Iso8601Time(), line)
+        }
+    }
+    return ""
 }
 
 // getDefaultProfile extracts the default profile name from the [DEFAULT] section
@@ -74,39 +106,11 @@ func getDefaultProfile(configContent []byte) string {
             continue
         }
 
-        // Break out of the loop if another section starts
         if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
             inDefaultSection = false
         }
 
         if inDefaultSection && strings.HasPrefix(line, "default-user") {
-            parts := strings.Split(line, "=")
-            if len(parts) == 2 {
-                return strings.TrimSpace(parts[1])
-            }
-        }
-    }
-    return ""
-}
-
-// parseLinodeConfig extracts the access token from the specified profile section
-func parseLinodeConfig(configContent []byte, profile string) string {
-    scanner := bufio.NewScanner(strings.NewReader(string(configContent)))
-    inSection := false
-    sectionHeader := fmt.Sprintf("[%s]", profile)
-    for scanner.Scan() {
-        line := strings.TrimSpace(scanner.Text())
-        log.Printf("Parsing line: %s", line)
-        if line == sectionHeader {
-            log.Printf("Entering section: %s", profile)
-            inSection = true
-            continue
-        } else if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
-            log.Printf("Exiting section: %s", profile)
-            inSection = false
-        }
-
-        if inSection && strings.HasPrefix(line, "token") {
             parts := strings.Split(line, "=")
             if len(parts) == 2 {
                 return strings.TrimSpace(parts[1])

@@ -3,13 +3,14 @@ package ui
 import (
     "fmt"
     "kubectm/pkg/credentials"
+    "kubectm/pkg/utils"  // Import the utils package
 
     "github.com/AlecAivazis/survey/v2"
 )
 
 func SelectCredentials(creds []credentials.Credential) []credentials.Credential {
     if len(creds) == 1 {
-        fmt.Println("Only one set of credentials found, using it by default.")
+        utils.InfoLogger.Printf("Only one set of credentials found, using it by default.")
         return creds
     }
 

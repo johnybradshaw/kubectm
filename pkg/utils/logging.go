@@ -2,10 +2,17 @@ package utils
 
 import (
     "log"
+    "io/ioutil"
     "os"
     "time"
+    "strings"
     "github.com/fatih/color"
 )
+
+func init() {
+    // Disable the default logger by redirecting it to ioutil.Discard
+    log.SetOutput(ioutil.Discard)
+}
 
 // Loggers for different log levels
 var (
@@ -16,6 +23,17 @@ var (
 )
 
 // iso8601Time returns the current time formatted in ISO 8601
+//
+// It formats the current time in the ISO 8601 format, which is the
+// recommended format for timestamps in the Kubernetes API.
 func Iso8601Time() string {
     return time.Now().Format(time.RFC3339)
+}
+
+// ObfuscateCredential partially hides a credential string, showing only the first and last 4 characters.
+func ObfuscateCredential(credential string) string {
+    if len(credential) <= 8 {
+        return credential // If the credential is too short, return it as is
+    }
+    return credential[:4] + strings.Repeat("*", len(credential)-8) + credential[len(credential)-4:]
 }

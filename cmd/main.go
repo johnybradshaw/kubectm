@@ -25,12 +25,17 @@ var (
     actionLogger  = log.New(os.Stdout, color.CyanString("[ACTION] "), 0)
 )
 
+// iso8601Time returns the current time in the ISO 8601 format
 func iso8601Time() string {
+    // Format the current time according to the ISO 8601 standard
+    // Example: 2022-11-19T15:03:52Z
     return time.Now().Format(time.RFC3339)
 }
 
+// printUsage prints the usage message for the kubectm command.
 func printUsage() {
-    color.Cyan(`kubectm - A tool to manage Kubernetes configurations across multiple cloud providers.
+    // Print the usage message
+    color.Cyan(`kubectm - A tool to download and integrate Kubernetes configurations across multiple cloud providers.
 
 Usage: kubectm [options]
 
@@ -38,54 +43,84 @@ Options:
   -h, --help        Show this help message and exit.
   -v, --version     Show the version of kubectm.
   --reset-creds     Reset the stored credentials and prompt for new ones.
+
+For more information and source code, visit:
+https://github.com/johnybradshaw/kubectm
 `)
 }
 
+// SaveSelectedCredentials saves the selected credentials to the specified file.
+//
+// It takes a slice of Credential objects as an argument, which represents
+// the selected credentials.
+//
+// The function creates the specified file if it doesn't exist, and overwrites
+// the file if it does exist.
+//
+// The function returns an error if there is a problem writing the file.
 func SaveSelectedCredentials(creds []credentials.Credential) error {
+    // Get the user's home directory
     homeDir, err := os.UserHomeDir()
     if err != nil {
         return err
     }
 
+    // Create the .kubectm directory if it doesn't exist
     configDir := filepath.Join(homeDir, ".kubectm")
-    configFile := filepath.Join(configDir, "selected_credentials.json")
-
     err = os.MkdirAll(configDir, os.ModePerm)
     if err != nil {
         return err
     }
 
+    // Create the selected_credentials.json file if it doesn't exist, or overwrite it if it does
+    configFile := filepath.Join(configDir, "selected_credentials.json")
     file, err := os.Create(configFile)
     if err != nil {
         return err
     }
     defer file.Close()
 
+    // Encode the selected credentials as JSON and write them to the file
     encoder := json.NewEncoder(file)
     return encoder.Encode(creds)
 }
 
+// LoadSelectedCredentials loads the selected credentials from the
+// ~/.kubectm/selected_credentials.json file.
+//
+// It returns a slice of Credential objects and an error if the file
+// doesn't exist or there is a problem decoding the JSON.
 func LoadSelectedCredentials() ([]credentials.Credential, error) {
+    // Get the user's home directory
     homeDir, err := os.UserHomeDir()
     if err != nil {
         return nil, err
     }
 
+    // Construct the path to the selected_credentials.json file
     configFile := filepath.Join(homeDir, ".kubectm", "selected_credentials.json")
 
+    // Open the file for reading
     file, err := os.Open(configFile)
     if err != nil {
+        // If the file doesn't exist or there is a problem reading the file,
+        // return an error
         return nil, err
     }
+
+    // Defer the closing of the file until after the function returns
     defer file.Close()
 
+    // Decode the JSON in the file into a slice of Credential objects
     var creds []credentials.Credential
     decoder := json.NewDecoder(file)
     err = decoder.Decode(&creds)
     if err != nil {
+        // If there is a problem decoding the JSON, return an error
         return nil, err
     }
 
+    // Return the slice of Credential objects
     return creds, nil
 }
 

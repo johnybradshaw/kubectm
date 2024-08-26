@@ -1,6 +1,7 @@
 name: Scan, Build, & Publish
+
 env:
-  tag: ${{github.ref_name}}
+  tag: ${{ github.ref_name }}
   binary_name: kubectm
 
 on:
@@ -13,7 +14,8 @@ on:
       - "**.go"
       - ".github/workflows/build.yml"
   pull_request:
-    branches: [ "main" ] # Only run on pull requests to main
+    branches:
+      - 'main' # Only run on pull requests to main
   workflow_dispatch: # Triggered manually
 
 permissions: read-all
@@ -22,12 +24,11 @@ jobs:
   scan: # Check for vulnerabilities
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/golang@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      # Uncomment the following step to upload the result to GitHub Code Scanning
         with:
           args: --sarif-file-output=snyk.sarif
       - name: Upload result to GitHub Code Scanning
@@ -36,10 +37,9 @@ jobs:
           sarif_file: snyk.sarif
 
   args:
-    if: startsWith(github.ref, 'refs/tags/v') && github.ref_name == 'main' # Only run on meaningful update
-    
     runs-on: ubuntu-latest
     needs: scan # Depends on the security job, don't run until it's done.
+    if: startsWith(github.ref, 'refs/tags/v')
     outputs:
       commit-date: ${{ steps.ldflags.outputs.commit-date }}
       commit: ${{ steps.ldflags.outputs.commit }}
@@ -48,17 +48,17 @@ jobs:
       binary-name: ${{ env.binary_name }}
     steps:
       - id: checkout # Checkout
-        uses: actions/checkout@v4 
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
       - id: setup-go # Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v2
         with:
           go-version-file: './go.mod' # Use the go.mod file
           check-latest: true
           cache-dependency-path: |
-                  ./go.sum
-                  ./go.mod
+            ./go.sum
+            ./go.mod
       - id: ldflags # Create the LDFLAGS
         run: |
           echo "commit-date=$(git log --date=iso8601-strict -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
@@ -67,22 +67,40 @@ jobs:
           echo "tree-state=$(if git diff --quiet; then echo "clean"; else echo "dirty"; fi)" >> "$GITHUB_OUTPUT"
 
   build:
-      if: startsWith(github.ref, 'refs/tags/v') && github.ref_name == 'main' # Only run on meaningful update
-      permissions:
-        id-token: write # To sign the provenance.
-        contents: write # To upload assets to release.
-        actions: read # To read the workflow path.
-      needs: args # Depends on the args job.
-      strategy: # Build strategy
-        fail-fast: true # Anything fails, fail everything
-        matrix:
-          goos: [linux, darwin, windows]
-          goarch: [amd64, arm64]
-      uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
-      with:
-        go-version-file: './go.mod' # Use the go.mod file
-        upload-assets: false # Upload assets to release
-        upload-tag-name: ${{ github.ref_name }}
-        config-file: .slsa-goreleaser/${{ matrix.os }}-${{ matrix.arch }}.yml
-        evaluated-envs: "BINARY_NAME:${{ needs.args.outputs.binary-name }},COMMIT_DATE:${{ needs.args.outputs.commit-date }}, COMMIT:${{ needs.args.outputs.commit }}, VERSION:${{ needs.args.outputs.version }}, TREE_STATE:${{ needs.args.outputs.tree-state }}"
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      id-token: write # To sign the provenance.
+      contents: write # To upload assets to release.
+      actions: read # To read the workflow path.
+    needs: args # Depends on the args job.
+    strategy: # Build strategy
+      fail-fast: true # Anything fails, fail everything
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
 
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.20'
+
+      - name: Build binaries
+        run: |
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd
+
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ env.binary_name }}-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ env.binary_name }}-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

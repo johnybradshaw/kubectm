@@ -18,29 +18,30 @@ type Credential struct {
 func RetrieveAll() ([]Credential, error) {
     var credentials []Credential
 
-    // Discover AWS credentials
-    awsCreds, err := retrieveAWSCredentials()
-    if err != nil {
-        log.Printf("Error retrieving AWS credentials: %v", err)
-    } else if awsCreds != nil {
-        credentials = append(credentials, *awsCreds)
-    }
+    // Not yet implemented
+    // // Discover AWS credentials
+    // awsCreds, err := retrieveAWSCredentials()
+    // if err != nil {
+    //     log.Printf("Error retrieving AWS credentials: %v", err)
+    // } else if awsCreds != nil {
+    //     credentials = append(credentials, *awsCreds)
+    // }
 
-    // Discover Azure credentials
-    azureCreds, err := retrieveAzureCredentials()
-    if err != nil {
-        log.Printf("Error retrieving Azure credentials: %v", err)
-    } else if azureCreds != nil {
-        credentials = append(credentials, *azureCreds)
-    }
+    // // Discover Azure credentials
+    // azureCreds, err := retrieveAzureCredentials()
+    // if err != nil {
+    //     log.Printf("Error retrieving Azure credentials: %v", err)
+    // } else if azureCreds != nil {
+    //     credentials = append(credentials, *azureCreds)
+    // }
 
-    // Discover GCP credentials
-    gcpCreds, err := retrieveGCPCredentials()
-    if err != nil {
-        log.Printf("Error retrieving GCP credentials: %v", err)
-    } else if gcpCreds != nil {
-        credentials = append(credentials, *gcpCreds)
-    }
+    // // Discover GCP credentials
+    // gcpCreds, err := retrieveGCPCredentials()
+    // if err != nil {
+    //     log.Printf("Error retrieving GCP credentials: %v", err)
+    // } else if gcpCreds != nil {
+    //     credentials = append(credentials, *gcpCreds)
+    // }
 
     // Discover Linode credentials
     linodeCreds, err := retrieveLinodeCredentials()
@@ -68,6 +69,8 @@ func retrieveAWSCredentials() (*Credential, error) {
         },
     }, nil
 }
+
+
 
 // The rest of the functions (retrieveAzureCredentials, retrieveGCPCredentials, retrieveLinodeCredentials)
 // have been implemented as stubs in their respective files.

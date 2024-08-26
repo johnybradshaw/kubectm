@@ -1,20 +1,26 @@
-# kubectm (aka acc-kubeconfig-cli)
+# kubectm
 
 [![CodeQL](https://github.com/johnybradshaw/kubectm/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/johnybradshaw/kubectm/actions/workflows/github-code-scanning/codeql)
 
 ## Overview
 
-This CLI app will merge your `kubeconfig`s from all [Linode Kubernetes Engine (LKE)](https://www.linode.com/products/kubernetes/?utm_medium=website&utm_source=github-johnybradshaw) clusters into your `~/.kube/config`. It will either use your credentials stored in the `linode-cli` config file or the `LINODE_API_TOKEN` environment variable to authenticate with the Linode API.
+This CLI app will download and merge your `kubeconfig`s from all Cloud providers into your current `kubeconfig` file *(typically in `~/.kube/config`)*.
+
+### Supported Providers
+
+- [Linode Kubernetes Engine (LKE)](https://www.linode.com/products/kubernetes/?utm_medium=website&utm_source=github-johnybradshaw)
 
 ## Usage
-
-The `acc-kubeconfig-cli` requires you to have already set your Linode API token in the environment variable `LINODE_API_TOKEN` or your `linode-cli` config file.
 
 To get started, run the following command:
 
 ```bash
-./acc-kubeconfig-cli
+./kubectm
 ```
+
+### Linode / Akamai Connected Cloud
+
+The `kubectm` requires you to have already set your Linode API token in the environment variable `LINODE_API_TOKEN` or in your `linode-cli` config file.
 
 It will merge the kubeconfig files of all Linode Kubernetes Engine (LKE) clusters into a single file, and the outut will look similar to:
 
@@ -47,5 +53,5 @@ https://github.com/johnybradshaw/acc-kubeconfig-cli
 To build the binary, run the following command:
 
 ```bash
-go build ./cmd/lke-kubeconfigconfig
+go build ./cmd
 ```

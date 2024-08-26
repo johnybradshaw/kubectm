@@ -4,6 +4,7 @@ go 1.23.0
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
+	github.com/fatih/color v1.17.0
 	k8s.io/client-go v0.31.0
 )
 

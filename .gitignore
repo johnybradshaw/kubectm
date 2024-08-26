@@ -16,11 +16,12 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+.DS_Store
 **/.DS_Store
 
 # Go workspace file
 go.work
 go.work.sum
 .slsa-goreleaser2
-.DS_Store
 kubectm
+.DS_Store

@@ -57,21 +57,6 @@ jobs:
           args: --sarif-file-output=snyk.sarif
           
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk.sarif
-      - name: Snyk test
-        run: snyk test
-      
-      - name: Snyk Code test
-        run: snyk code test --sarif > snyk-code.sarif # || true
-
-        # Runs Snyk Open Source (SCA) analysis and uploads result to Snyk.
-      - name: Snyk Open Source monitor
-        run: snyk monitor --all-projects
-
-        # Push the Snyk Code results into GitHub Code Scanning tab
-      - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: snyk-code.sarif

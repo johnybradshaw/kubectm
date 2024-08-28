@@ -74,7 +74,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           run-id: ${{ needs.prepare-release.outputs.run-id }} # Correct reference for run-id output
-          name: kubectm-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: kubectm-${{ matrix.goos }}-${{ needs.prepare-release.outputs.version }}-${{ matrix.goarch }}
           path: kubectm-${{ matrix.goos }}-${{ matrix.goarch }}/
 
       - name: Download Signing Keys

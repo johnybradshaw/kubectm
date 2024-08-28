@@ -80,8 +80,8 @@ jobs:
         run: |
           VERSION=$(git describe --tags --always --dirty | cut -c2-)
           echo "commit-date=$(git log --date=iso8601-strict -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
-          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT" # Use the full commit hash
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT" # Use the version from the tag
           echo "tree-state=$(if git diff --quiet; then echo 'clean'; else echo 'dirty'; fi)" >> "$GITHUB_OUTPUT"
 
       - name: Find Signing Keys
@@ -99,22 +99,6 @@ jobs:
         with:
           name: "signing-keys"  # Use a consistent name for uploading and downloading
           path: keys/
-
-      - name: Generate Release Notes
-        id: generate_release_notes
-        run: |
-          echo "## Release Notes for ${{ github.ref_name }}" > release_notes.md
-          echo "" >> release_notes.md
-          echo "### Commits" >> release_notes.md
-          git log --oneline $(git describe --tags --abbrev=0)..HEAD >> release_notes.md
-          echo "Release notes generated."
-
-      - name: Upload Release Notes
-        id: upload-release-notes
-        uses: actions/upload-artifact@v4
-        with:
-          name: "release-notes"  # Use a consistent name for uploading and downloading
-          path: release_notes.md
 
   build:
     runs-on: ubuntu-latest
@@ -151,26 +135,6 @@ jobs:
           gpg --batch --import *.asc
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
           gpg --list-keys
-
-      - name: Save Version to File
-        run: |
-          echo "${{ needs.prepare-build.outputs.version }}" > version.txt
-          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
-          --pinentry-mode loopback \
-          --detach-sign \
-          --armor \
-          --output \
-          version.txt.sig \
-          version.txt
-
-        
-      - name: Upload Version Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: version
-          path: |
-            version.txt
-            version.txt.sig
   
       - name: Sign the Binary
         run: |

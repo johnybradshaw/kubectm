@@ -31,7 +31,6 @@ jobs:
               repo: context.repo.repo,
               workflow_id: 'build.yml', // Use the file name of your build workflow
               status: 'success', // Only get successful runs
-              tag: 'v', // Only get runs with tags that start with 'v'
               per_page: 10, // Get the latest 10 successful runs
             });
 
@@ -70,53 +69,30 @@ jobs:
       actions: read # To read the workflow path.
       id-token: write # To sign the provenance.
       attestations: write # To sign the build provenance.
-    strategy:
-      fail-fast: true
-      matrix:
-        goos: [linux, darwin, windows]
-        goarch: [amd64, arm64]
     steps:
       - name: Download Artifacts
         id: download-artifacts
         uses: actions/download-artifact@v4
         with:
           run-id: ${{ needs.prepare-release.outputs.run-id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List Artifacts
         id: list-artifacts
-        run: |
-          ls -R # For debugging
-
-      # - name: Create Release
-      #   uses: softprops/action-gh-release@v2.0.8
-      #   with:
-      #     tag_name: v${{ needs.prepare-release.outputs.version }} # Correct tag using the version
-      #     generate_release_notes: true
-      #     files: |
-      #       kubectm-${{ matrix.goos }}-${{ matrix.goarch }}/kubectm-${{ needs.prepare-release.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
-      #       kubectm-${{ matrix.goos }}-${{ matrix.goarch }}/kubectm-${{ needs.prepare-release.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
-      #       signing-keys/*.asc
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # - name: Attest Build Provenance
-      #   uses: actions/attest-build-provenance@v1.4.2
-      #   with:
-      #     subject-path: kubectm-${{ matrix.goos }}-${{ matrix.goarch }}/kubectm-${{ needs.prepare-release.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ls -R # For debugging
 
       - name: Create Release
         id: create-release
         uses: softprops/action-gh-release@v2.0.8
         with:
           generate_release_notes: true
-          tag_name: v${{ needs.prepare-release.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}
-          
+          tag_name: v${{ needs.prepare-release.outputs.version }} # Use the stripped version as tag
           files: |
-            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ needs.prepare-release.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
-            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ needs.prepare-release.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
+            kubectm-linux-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-linux-amd64.zip
+            kubectm-linux-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-linux-amd64.zip.sig
+            kubectm-darwin-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-darwin-amd64.zip
+            kubectm-darwin-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-darwin-amd64.zip.sig
+            kubectm-windows-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-windows-amd64.zip
+            kubectm-windows-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-windows-amd64.zip.sig
             signing-keys/*.asc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -125,17 +101,16 @@ jobs:
         id: attest-build-provenance
         uses: actions/attest-build-provenance@v1.4.2
         with:
-          subject-path: ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ needs.prepare-release.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+          subject-path: kubectm-linux-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-linux-amd64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    # New step to add additional tags
+
       - name: Add Additional Tags
         id: additional-tags
         if: success() # Only run if the release is created successfully
         run: |
           TAG_NAME="v${{ needs.prepare-release.outputs.version }}"
-          ADDITIONAL_TAGS=("latest" "stable" "${{ matrix.goos }}" "${{ matrix.goarch }}" "${{ matrix.goos }}-${{ matrix.goarch }}")
+          ADDITIONAL_TAGS=("latest" "stable")
           for tag in "${ADDITIONAL_TAGS[@]}"; do
             echo "Creating tag $tag..."
             git tag "$tag" "$TAG_NAME"

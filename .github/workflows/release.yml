@@ -93,13 +93,15 @@ jobs:
             signing-keys/*.asc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Remove Signatures
+        id: remove-signatures
+        run: |
+          rm -f **/*.sig
 
       - name: Attest All Binaries
         id: attest-build-provenance
-        run: |
-          for file in **/*; do
-            echo "Attesting $file..."
-            gh run upload-provenance --artifact "$file"
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/attest-build-provenance@v1.4.2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          subject-path: '**/kubectm-*' # Attest all binaries

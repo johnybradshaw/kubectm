@@ -108,7 +108,7 @@ jobs:
         goos: [linux, darwin, windows] # Build for linux, macos and windows
         goarch: [amd64, arm64] # Build for amd64 and arm64
     runs-on: ${{matrix.goos}}-latest # Use the latest version of the OS
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') # Only run on tags
     permissions:
       id-token: write # To sign the provenance.
       contents: write # To upload assets to release.

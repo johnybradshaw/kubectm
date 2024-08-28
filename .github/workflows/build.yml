@@ -131,6 +131,15 @@ jobs:
           name: "Signing Keys"
           path: keys/
 
+      - name: Generate Release Notes
+        id: generate_release_notes
+        run: |
+          echo "## Release Notes for ${{ github.ref_name }}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### Commits" >> release_notes.md
+          git log --oneline $(git describe --tags --abbrev=0)..HEAD >> release_notes.md
+          echo "Release notes generated."
+
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
         with:

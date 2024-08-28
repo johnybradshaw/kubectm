@@ -13,9 +13,17 @@
 - **Error Handling**: Handles edge cases, such as invalid or expired credentials, and provides meaningful error messages.
 - **Customizable Extensions**: Adds custom extensions to the kubeconfig, including Linode's branding in the context's extension field to enable [Aptakube](https://aptakube.com/?ref=johnybradshaw) integration *affiliate link*.
 
-### Supported Providers
+## Supported Providers
 
 - [Linode Kubernetes Engine (LKE)](https://www.linode.com/products/kubernetes/?utm_medium=website&utm_source=github-johnybradshaw)
+
+### Linode / Akamai Connected Cloud
+
+The `kubectm` requires you to have already set your Linode API token in the environment variable `LINODE_API_TOKEN` or in your `linode-cli` config file.
+
+## Installation
+
+To install `kubectm` download the appropriate binary for your platform and architecture, and add it to your `$PATH`.
 
 ## Usage
 
@@ -25,43 +33,12 @@ To get started, run the following command:
 ./kubectm
 ```
 
-### Linode / Akamai Connected Cloud
+### --reset-creds
 
-The `kubectm` requires you to have already set your Linode API token in the environment variable `LINODE_API_TOKEN` or in your `linode-cli` config file.
-
-It will merge the kubeconfig files of all Linode Kubernetes Engine (LKE) clusters into the main `~/.kube/config` file. The output will be a single file, and the output will look similar to:
+To reset the stored credentials and prompt for new ones, run the following command:
 
 ```bash
 ❯ ./kubectm --reset-creds
-[INFO] 2024-08-26T20:37:38+01:00 Starting kubectm...
-[INFO] 2024-08-26T20:37:38+01:00 Looking for Linode config in directory: /Users/_user_/.config/linode-cli
-[INFO] 2024-08-26T20:37:38+01:00 Default profile found:<<user>>
-[INFO] 2024-08-26T20:37:38+01:00 Exiting section:<<user>>
-[INFO] 2024-08-26T20:37:38+01:00 Parsing non-sensitive line: [DEFAULT]
-[INFO] 2024-08-26T20:37:38+01:00 Parsing non-sensitive line: default-user =<<user>>
-[INFO] 2024-08-26T20:37:38+01:00 Parsing non-sensitive line:
-[INFO] 2024-08-26T20:37:38+01:00 Entering section:<<user>>
-[INFO] 2024-08-26T20:37:38+01:00 Access token found: 3065********************************************************dbd7
-[INFO] 2024-08-26T20:37:38+01:00 Linode credentials found: map[AccessToken:3065********************************************************dbd7]
-[INFO] Only one set of credentials found, using it by default.
-[INFO] 2024-08-26T20:37:38+01:00 Downloading kubeconfig from Linode
-[ACTION] 2024-08-26T20:37:40+01:00 Downloading kubeconfig for cluster: o1g2-it-mil-lke
-[INFO] 2024-08-26T20:37:41+01:00 Kubeconfig saved to /Users/_user_/.kube/o1g2-it-mil-lke-kubeconfig.yaml
-[ACTION] 2024-08-26T20:37:41+01:00 Downloading kubeconfig for cluster: komodor
-[INFO] 2024-08-26T20:37:42+01:00 Kubeconfig saved to /Users/_user_/.kube/komodor-kubeconfig.yaml
-[ACTION] 2024-08-26T20:37:42+01:00 Downloading kubeconfig for cluster: zeet-acc
-[INFO] 2024-08-26T20:37:44+01:00 Kubeconfig saved to /Users/_user_/.kube/zeet-acc-kubeconfig.yaml
-[ACTION] 2024-08-26T20:37:44+01:00 Merging kubeconfig from /Users/_user_/.kube/komodor-kubeconfig.yaml
-[ACTION] 2024-08-26T20:37:44+01:00 Context komodor already exists, skipping...
-[ACTION] 2024-08-26T20:37:44+01:00 Merging kubeconfig from /Users/_user_/.kube/o1g2-it-mil-lke-kubeconfig.yaml
-[ACTION] 2024-08-26T20:37:44+01:00 Context o1g2-it-mil-lke already exists, skipping...
-[ACTION] 2024-08-26T20:37:44+01:00 Merging kubeconfig from /Users/_user_/.kube/zeet-acc-kubeconfig.yaml
-[ACTION] 2024-08-26T20:37:44+01:00 Context zeet-acc already exists, skipping...
-[INFO] 2024-08-26T20:37:44+01:00 Successfully merged kubeconfigs into /Users/_user_/.kube/config
-[INFO] 2024-08-26T20:37:44+01:00 Deleted file /Users/_user_/.kube/komodor-kubeconfig.yaml
-[INFO] 2024-08-26T20:37:44+01:00 Deleted file /Users/_user_/.kube/o1g2-it-mil-lke-kubeconfig.yaml
-[INFO] 2024-08-26T20:37:44+01:00 Deleted file /Users/_user_/.kube/zeet-acc-kubeconfig.yaml
-[INFO] 2024-08-26T20:37:44+01:00 kubectm finished successfully.
 ```
 
 ### --help

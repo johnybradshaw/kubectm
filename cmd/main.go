@@ -14,7 +14,8 @@ import (
 )
 
 const (
-    version         = "1.0.0"
+    // Version is set during build time using -ldflags
+    version         = "development"
     storedCredsPath = ".kubectm/selected_credentials.json"
 )
 

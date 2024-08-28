@@ -80,9 +80,10 @@ jobs:
       - name: LDFLAGS Variables
         id: ldflags
         run: |
+          VERSION=$(git describe --tags --always --dirty | cut -c2-)
           echo "commit-date=$(git log --date=iso8601-strict -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
           echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-          echo "version=$(git describe --tags --always --dirty | cut -c2-)" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tree-state=$(if git diff --quiet; then echo 'clean'; else echo 'dirty'; fi)" >> "$GITHUB_OUTPUT"
 
       - name: Find Signing Keys
@@ -130,11 +131,11 @@ jobs:
   
       - name: Build binaries
         run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ env.binary_name }} ./cmd
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags "-X main.Version=${{ needs.prepare-build.outputs.version }}" -o ${{ env.binary_name }} ./cmd
   
-      - name: Archive Binary
+      - name: Archive Binary with Version
         run: |
-          zip -r ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip ${{ env.binary_name }}
+          zip -r ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip ${{ env.binary_name }}
   
       - name: Setup GPG
         run: |
@@ -144,30 +145,29 @@ jobs:
   
       - name: Sign the Binary
         run: |
-          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" --pinentry-mode loopback --detach-sign --armor --output ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" --pinentry-mode loopback --detach-sign --armor --output ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
-            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
-            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
+            ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+            ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
-            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
-            *.asc  # Add all .asc files in the root of the repo to the release
-          body_path: release_notes.md  # Use the generated release notes
+            ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+            ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
+            keys/*.asc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
       - name: Attest Build Provenance
         uses: actions/attest-build-provenance@v1.4.2
         with:
-          subject-path: ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+          subject-path: ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

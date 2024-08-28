@@ -89,7 +89,7 @@ jobs:
           generate_release_notes: true
           tag_name: v${{ needs.prepare-release.outputs.version }} # Use the stripped version as tag
           files: |
-            **/*
+            **/kubectm-*
             signing-keys/*.asc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

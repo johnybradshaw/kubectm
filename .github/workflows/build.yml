@@ -51,6 +51,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: scan
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write # To upload assets to release.
+      actions: read # To read the workflow path.
     outputs:
       commit-date: ${{ steps.ldflags.outputs.commit-date }}
       commit: ${{ steps.ldflags.outputs.commit }}
@@ -58,12 +61,14 @@ jobs:
       tree-state: ${{ steps.ldflags.outputs.tree-state }}
       binary-name: ${{ env.binary_name }}
     steps:
-      - id: checkout
+      - name: Checkout Code
+        id: checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - id: setup-go
+      - name: Setup Go
+        id: setup-go
         uses: actions/setup-go@v5.0.2
         with:
           go-version-file: './go.mod'
@@ -72,12 +77,38 @@ jobs:
             ./go.sum
             ./go.mod
 
-      - id: ldflags
+      - name: LDFLAGS Variables
+        id: ldflags
         run: |
           echo "commit-date=$(git log --date=iso8601-strict -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
           echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
           echo "version=$(git describe --tags --always --dirty | cut -c2-)" >> "$GITHUB_OUTPUT"
           echo "tree-state=$(if git diff --quiet; then echo 'clean'; else echo 'dirty'; fi)" >> "$GITHUB_OUTPUT"
+
+      - name: Find Signing Keys
+        id: find_keys
+        run: |
+          echo "Listing signing keys:"
+          ls -la
+          # Find and copy the signing keys to a separate directory for uploading
+          mkdir -p keys
+          cp *.asc keys/
+
+      - name: Upload Signing Keys
+        id: upload_keys
+        uses: actions/upload-artifact@v4
+        with:
+          name: "Signing Keys"
+          path: keys/
+
+      - name: Generate Release Notes
+        id: generate_release_notes
+        run: |
+          echo "## Release Notes for ${{ github.ref_name }}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### Commits" >> release_notes.md
+          git log --oneline $(git describe --tags --abbrev=0)..HEAD >> release_notes.md
+          echo "Release notes generated."
 
   build:
     runs-on: ubuntu-latest
@@ -114,31 +145,6 @@ jobs:
       - name: Sign the Binary
         run: |
           gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" --pinentry-mode loopback --detach-sign --armor --output ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
-
-      - name: Find Signing Keys
-        id: find_keys
-        run: |
-          echo "Listing signing keys:"
-          ls -la
-          # Find and copy the signing keys to a separate directory for uploading
-          mkdir -p keys
-          cp *.asc keys/
-
-      - name: Upload Signing Keys
-        id: upload_keys
-        uses: actions/upload-artifact@v4
-        with:
-          name: "Signing Keys"
-          path: keys/
-
-      - name: Generate Release Notes
-        id: generate_release_notes
-        run: |
-          echo "## Release Notes for ${{ github.ref_name }}" > release_notes.md
-          echo "" >> release_notes.md
-          echo "### Commits" >> release_notes.md
-          git log --oneline $(git describe --tags --abbrev=0)..HEAD >> release_notes.md
-          echo "Release notes generated."
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4

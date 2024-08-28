@@ -183,8 +183,8 @@ jobs:
           generate_release_notes: true
           tag_name: ${{ matrix.goos }}-${{ matrix.goarch }}
           files: |
-            {{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/{{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
-            {{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/{{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
+            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
             signing-keys/*.asc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -193,6 +193,6 @@ jobs:
         id: attest-build-provenance
         uses: actions/attest-build-provenance@v1.4.2
         with:
-          subject-path: /{{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}.zip
+          subject-path: /${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

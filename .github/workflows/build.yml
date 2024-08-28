@@ -164,6 +164,8 @@ jobs:
       matrix:
         goos: [linux, darwin, windows]
         goarch: [amd64, arm64]
+    env:
+      version: ${{ needs.prepare-build.outputs.version }} # Define version as an environment variable
     steps:
       - name: Download Artifacts
         id: download-artifacts
@@ -181,11 +183,11 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           generate_release_notes: true
-          tag_name: ${{ matrix.goos }}-${{ matrix.goarch }}, v${{ needs.prepare-build.outputs.version }}, ${{ matrix.goos }}, ${{ matrix.goarch }}
+          tag_name: ${{ matrix.goos }}-${{ matrix.goarch }}, v${{ env.version }}, ${{ matrix.goos }}, ${{ matrix.goarch }}
           latest: true
           files: |
-            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
-            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
+            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ env.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ env.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
             signing-keys/*.asc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -194,6 +196,6 @@ jobs:
         id: attest-build-provenance
         uses: actions/attest-build-provenance@v1.4.2
         with:
-          subject-path: /${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}.zip
+          subject-path: /${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ env.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

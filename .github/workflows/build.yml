@@ -125,8 +125,9 @@ jobs:
   
       - name: Install GPG (Windows)
         if: matrix.goos == 'windows'
-        run: choco install gnupg -y
-        shell: powershell
+        uses: crazy-max/ghaction-chocolatey@v3.0.0
+        with:
+          args: install gnupg
 
       - name: Build binary
         id: build-binary

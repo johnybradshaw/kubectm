@@ -31,6 +31,7 @@ jobs:
               repo: context.repo.repo,
               workflow_id: 'build.yml', // Use the file name of your build workflow
               status: 'success', // Only get successful runs
+              tag: 'v', // Only get runs with tags that start with 'v'
               per_page: 10, // Get the latest 10 successful runs
             });
 
@@ -46,6 +47,8 @@ jobs:
 
             core.setOutput('run-id', run_id); // Set the output variable for the run ID
             core.setOutput('tag-name', tag_name); // Set the output variable for the tag name
+
+            // Log the run ID and tag name
             console.log(`Found run ${run_id} with tag ${tag_name}`);
           result-encoding: string
 
@@ -55,6 +58,8 @@ jobs:
           # Extract the version by stripping the 'v' prefix from the tag
           TAG_NAME=${{ steps.list-runs.outputs.tag-name }}
           VERSION=${TAG_NAME#v} # Remove 'v' prefix
+          echo "Tag: $TAG_NAME"
+          echo "Version: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT # Output the stripped version
 
   release:

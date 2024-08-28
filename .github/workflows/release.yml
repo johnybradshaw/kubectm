@@ -9,6 +9,7 @@ permissions:
 
 env:
   binary_name: kubectm
+  version: ${{ github.ref_name }}
 
 jobs:
   prepare-release:
@@ -32,7 +33,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const runs = await github.actions.listWorkflowRuns({
+            const runs = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'build.yml', // Use the file name of your build workflow
@@ -41,8 +42,6 @@ jobs:
             });
             const run_id = runs.data.workflow_runs[0].id;
             core.setOutput('run-id', run_id); // Set the output variable for the run ID
-          retries: 3
-          result-encoding: string
           
       - name: Use the run-id output
         id: use-run-id

@@ -86,6 +86,7 @@ jobs:
       id-token: write # To sign the provenance.
       contents: write # To upload assets to release.
       actions: read # To read the workflow path.
+      attestations: write # To sign the build provenance.
     needs: prepare-build
     strategy:
       fail-fast: true

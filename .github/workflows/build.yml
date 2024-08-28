@@ -124,7 +124,7 @@ jobs:
           # Linux/macOS Bash syntax
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
           go build -ldflags "-X main.Version=${{ needs.prepare-build.outputs.version }}" \
-          -o ${{ env.binary_name }} \
+          -o ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }} \
           ./cmd
         shell: bash
   

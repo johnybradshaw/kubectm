@@ -69,6 +69,7 @@ jobs:
       contents: write # To upload assets to release.
       actions: read # To read the workflow path.
       id-token: write # To sign the provenance.
+      attestations: write # To sign the build provenance.
     strategy:
       fail-fast: true
       matrix:
@@ -130,6 +131,7 @@ jobs:
     
     # New step to add additional tags
       - name: Add Additional Tags
+        id: additional-tags
         if: success() # Only run if the release is created successfully
         run: |
           TAG_NAME="v${{ needs.prepare-release.outputs.version }}"

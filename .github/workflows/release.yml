@@ -49,12 +49,6 @@ jobs:
         run: |
           echo "The run-id is ${{ steps.list-runs.outputs.run-id }}"
   
-  
-  
-  
-  
-  
-  
   release:
     needs: prepare-release # Required to get the version
     runs-on: ubuntu-latest

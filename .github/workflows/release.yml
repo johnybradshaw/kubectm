@@ -84,37 +84,21 @@ jobs:
         id: create-release
         uses: softprops/action-gh-release@v2.0.8
         with:
+          make_latest: true # Make the release the latest release
           generate_release_notes: true
           tag_name: v${{ needs.prepare-release.outputs.version }} # Use the stripped version as tag
           files: |
-            kubectm-linux-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-linux-amd64.zip
-            kubectm-linux-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-linux-amd64.zip.sig
-            kubectm-darwin-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-darwin-amd64.zip
-            kubectm-darwin-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-darwin-amd64.zip.sig
-            kubectm-windows-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-windows-amd64.zip
-            kubectm-windows-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-windows-amd64.zip.sig
+            **/*
             signing-keys/*.asc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Attest Build Provenance
+      - name: Attest All Zipped Artifacts
         id: attest-build-provenance
-        uses: actions/attest-build-provenance@v1.4.2
-        with:
-          subject-path: kubectm-linux-amd64/kubectm-${{ needs.prepare-release.outputs.version }}-linux-amd64.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Add Additional Tags
-        id: additional-tags
-        if: success() # Only run if the release is created successfully
         run: |
-          TAG_NAME="v${{ needs.prepare-release.outputs.version }}"
-          ADDITIONAL_TAGS=("latest" "stable")
-          for tag in "${ADDITIONAL_TAGS[@]}"; do
-            echo "Creating tag $tag..."
-            git tag "$tag" "$TAG_NAME"
-            git push origin "$tag"
+          for file in **/*; do
+            echo "Attesting $file..."
+            gh run upload-provenance --artifact "$file"
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

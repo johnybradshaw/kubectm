@@ -118,13 +118,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Install GPG (macOS)
+        if: matrix.goos == 'darwin'
+        run: brew install gnupg
+  
+      - name: Install GPG (Windows)
+        if: matrix.goos == 'windows'
+        run: choco install gnupg -y
+        shell: powershell
+
       - name: Build binary
         id: build-binary
         run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-          go build -ldflags "-X main.Version=${{ needs.prepare-build.outputs.version }}" \
-          -o ${{ env.binary_name }} \
-          ./cmd
+          if [ "${{ matrix.goos }}" == "windows" ]; then 
+            # Windows PowerShell syntax
+            $Env:GOOS="${{ matrix.goos }}"
+            $Env:GOARCH="${{ matrix.goarch }}"
+            go build -ldflags "-X main.Version=${{ needs.prepare-build.outputs.version }}" -o ${{ env.binary_name }} .\cmd
+          else 
+            # Linux/macOS Bash syntax
+            GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+            go build -ldflags "-X main.Version=${{ needs.prepare-build.outputs.version }}" \
+            -o ${{ env.binary_name }} \
+            ./cmd
+          fi
+        shell: bash
   
       - name: Setup GPG
         id: setup-gpg

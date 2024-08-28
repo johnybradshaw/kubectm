@@ -180,7 +180,7 @@ jobs:
 
       - name: Create Release
         id: create-release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2.0.8
         with:
           generate_release_notes: true
           #tag_name: ${{ matrix.goos }}-${{ matrix.goarch }}, v${{ env.version }}, ${{ matrix.goos }}, ${{ matrix.goarch }}
@@ -196,6 +196,6 @@ jobs:
         id: attest-build-provenance
         uses: actions/attest-build-provenance@v1.4.2
         with:
-          subject-path: /${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ env.version }}.zip
+          subject-path: /${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ env.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,4 +1,4 @@
-name: Scan, Build, & Publish
+name: Scan & Build
 
 env:
   tag: ${{ github.ref_name }}
@@ -136,14 +136,14 @@ jobs:
   
       - name: Build binaries
         run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} /
-          go build -ldflags "-X main.Version=${{ needs.prepare-build.outputs.version }}" /
-          -o ${{ env.binary_name }} /
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+          go build -ldflags "-X main.Version=${{ needs.prepare-build.outputs.version }}" \
+          -o ${{ env.binary_name }} \
           ./cmd
   
       - name: Archive Binary with Version
         run: |
-          zip -r ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip /
+          zip -r ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip \
           ${{ env.binary_name }}
   
       - name: Setup GPG
@@ -155,12 +155,12 @@ jobs:
       - name: Save Version to File
         run: |
           echo "${{ needs.prepare-build.outputs.version }}" > version.txt
-          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" /
-          --pinentry-mode loopback /
-          --detach-sign /
-          --armor /
-          --output /
-          version.txt.sig /
+          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+          --pinentry-mode loopback \
+          --detach-sign \
+          --armor \
+          --output \
+          version.txt.sig \
           version.txt
 
         
@@ -174,12 +174,12 @@ jobs:
   
       - name: Sign the Binary
         run: |
-          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" /
-          --pinentry-mode loopback /
-          --detach-sign /
-          --armor /
-          --output /
-          ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig /
+          gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+          --pinentry-mode loopback \
+          --detach-sign \
+          --armor \
+          --output \
+          ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig \
           ${{ env.binary_name }}-${{ needs.prepare-build.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
 
       - name: Upload Binaries

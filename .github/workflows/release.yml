@@ -120,3 +120,17 @@ jobs:
           subject-path: ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ needs.prepare-release.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    # New step to add additional tags
+      - name: Add Additional Tags
+        if: success() # Only run if the release is created successfully
+        run: |
+          TAG_NAME="v${{ needs.prepare-release.outputs.version }}"
+          ADDITIONAL_TAGS=("latest" "stable" "${{ matrix.goos }}" "${{ matrix.goarch }}" "${{ matrix.goos }}-${{ matrix.goarch }}")
+          for tag in "${ADDITIONAL_TAGS[@]}"; do
+            echo "Creating tag $tag..."
+            git tag "$tag" "$TAG_NAME"
+            git push origin "$tag"
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

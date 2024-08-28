@@ -107,6 +107,7 @@ jobs:
   
       - name: Setup GPG
         run: |
+          gpg --batch --import *.asc
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
           gpg --list-keys
   
@@ -122,12 +123,23 @@ jobs:
             ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
             ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
   
+      - name: Generate Release Notes
+        id: generate_release_notes
+        run: |
+          echo "## Release Notes for ${{ github.ref_name }}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### Commits" >> release_notes.md
+          git log --oneline $(git describe --tags --abbrev=0)..HEAD >> release_notes.md
+          echo "Release notes generated."
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
             ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
+            *.asc  # Add all .asc files in the root of the repo to the release
+          body_path: release_notes.md  # Use the generated release notes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   

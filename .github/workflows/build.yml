@@ -121,13 +121,12 @@ jobs:
             ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
             ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
   
-      - name: Create or Update Release
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
             ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
-          tag_name: v0.1.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   

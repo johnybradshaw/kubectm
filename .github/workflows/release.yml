@@ -9,25 +9,18 @@ permissions:
 
 env:
   binary_name: kubectm
-  version: ${{ github.ref_name }}
 
 jobs:
   prepare-release:
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') # Only run on tagged releases
     permissions:
       contents: write # To upload assets to release.
       actions: read # To read the workflow path.
       id-token: write # To sign the provenance.
     outputs:
-      version: ${{ steps.version.outputs.version }} # Output version
+      version: ${{ steps.extract-version.outputs.version }} # Output version stripped of the 'v' prefix
       run-id: ${{ steps.list-runs.outputs.run-id }} # Output the latest successful run ID
     steps:
-      - name: Setup Version
-        id: version
-        run: |
-          echo "version=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT  # Extract version from the ref name
-      
       - name: List All Workflow Runs
         id: list-runs
         uses: actions/github-script@v7
@@ -38,20 +31,34 @@ jobs:
               repo: context.repo.repo,
               workflow_id: 'build.yml', // Use the file name of your build workflow
               status: 'success', // Only get successful runs
-              per_page: 1, // Get the latest successful run
+              per_page: 10, // Get the latest 10 successful runs
             });
-            const run_id = runs.data.workflow_runs[0].id;
+
+            // Filter runs to find the first one with a tag that starts with 'v'
+            const run = runs.data.workflow_runs.find(run => run.head_branch && run.head_branch.startsWith('v'));
+            
+            if (!run) {
+              throw new Error('No successful build.yml run with a tag starting with "v" was found.');
+            }
+            
+            const run_id = run.id;
+            const tag_name = run.head_branch; // Assuming the tag is in the head_branch
+
             core.setOutput('run-id', run_id); // Set the output variable for the run ID
-          
-      - name: Use the run-id output
-        id: use-run-id
+            core.setOutput('tag-name', tag_name); // Set the output variable for the tag name
+          result-encoding: string
+
+      - name: Extract Version from Tag
+        id: extract-version
         run: |
-          echo "The run-id is ${{ steps.list-runs.outputs.run-id }}"
-  
+          # Extract the version by stripping the 'v' prefix from the tag
+          TAG_NAME=${{ steps.list-runs.outputs.tag-name }}
+          VERSION=${TAG_NAME#v} # Remove 'v' prefix
+          echo "version=$VERSION" >> $GITHUB_OUTPUT # Output the stripped version
+
   release:
     needs: prepare-release # Required to get the version
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') # Only run on tagged releases
     permissions:
       contents: write # To upload assets to release.
       actions: read # To read the workflow path.
@@ -85,7 +92,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2.0.8
         with:
-          tag_name: ${{ needs.prepare-release.outputs.version }} # Correct tag using the version
+          tag_name: v${{ needs.prepare-release.outputs.version }} # Correct tag using the version
           generate_release_notes: true
           files: |
             kubectm-${{ matrix.goos }}-${{ matrix.goarch }}/kubectm-${{ needs.prepare-release.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip

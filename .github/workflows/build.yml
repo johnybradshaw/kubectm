@@ -117,17 +117,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      # Install GPG (Linux/macOS)
-      - name: Install GPG (macOS)
-        if: matrix.goos == 'darwin'
-        run: brew install gnupg
-  
-      - name: Install GPG (Windows)
-        if: matrix.goos == 'windows'
-        uses: crazy-max/ghaction-chocolatey@v3.0.0
-        with:
-          args: install gnupg
 
       - name: Build binary
         id: build-binary

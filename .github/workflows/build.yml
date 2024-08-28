@@ -183,8 +183,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           generate_release_notes: true
-          tag_name: ${{ matrix.goos }}-${{ matrix.goarch }}, v${{ env.version }}, ${{ matrix.goos }}, ${{ matrix.goarch }}
-          latest: true
+          #tag_name: ${{ matrix.goos }}-${{ matrix.goarch }}, v${{ env.version }}, ${{ matrix.goos }}, ${{ matrix.goarch }}
+          make_latest: true
           files: |
             ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ env.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
             ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ env.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig

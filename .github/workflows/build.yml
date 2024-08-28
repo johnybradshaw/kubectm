@@ -198,6 +198,6 @@ jobs:
         id: attest-build-provenance
         uses: actions/attest-build-provenance@v1.4.2
         with:
-          subject-path: /${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ env.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+          subject-path: ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ env.binary_name }}-${{ env.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

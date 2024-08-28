@@ -46,6 +46,7 @@ jobs:
 
             core.setOutput('run-id', run_id); // Set the output variable for the run ID
             core.setOutput('tag-name', tag_name); // Set the output variable for the tag name
+            console.log(`Found run ${run_id} with tag ${tag_name}`);
           result-encoding: string
 
       - name: Extract Version from Tag

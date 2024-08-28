@@ -107,7 +107,7 @@ jobs:
       matrix: 
         goos: [linux, darwin, windows] # Build for linux, macos and windows
         goarch: [amd64, arm64] # Build for amd64 and arm64
-    runs-on: ${{matrix.goos}}-latest # Use the latest version of the OS
+    runs-on: ubuntu-latest 
     if: startsWith(github.ref, 'refs/tags/v') # Only run on tags
     permissions:
       id-token: write # To sign the provenance.
@@ -121,18 +121,11 @@ jobs:
       - name: Build binary
         id: build-binary
         run: |
-          if [ "${{ matrix.goos }}" == "windows" ]; then 
-            # Windows PowerShell syntax
-            $Env:GOOS="${{ matrix.goos }}"
-            $Env:GOARCH="${{ matrix.goarch }}"
-            go build -ldflags "-X main.Version=${{ needs.prepare-build.outputs.version }}" -o ${{ env.binary_name }} .\cmd
-          else 
-            # Linux/macOS Bash syntax
-            GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-            go build -ldflags "-X main.Version=${{ needs.prepare-build.outputs.version }}" \
-            -o ${{ env.binary_name }} \
-            ./cmd
-          fi
+          # Linux/macOS Bash syntax
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+          go build -ldflags "-X main.Version=${{ needs.prepare-build.outputs.version }}" \
+          -o ${{ env.binary_name }} \
+          ./cmd
         shell: bash
   
       - name: Setup GPG

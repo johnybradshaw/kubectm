@@ -118,6 +118,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      # Install GPG (Linux/macOS)
       - name: Install GPG (macOS)
         if: matrix.goos == 'darwin'
         run: brew install gnupg

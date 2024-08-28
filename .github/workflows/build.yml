@@ -114,9 +114,25 @@ jobs:
       - name: Sign the Binary
         run: |
           gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" --pinentry-mode loopback --detach-sign --armor --output ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
-  
+
+      - name: Find Signing Keys
+        id: find_keys
+        run: |
+          echo "Listing signing keys:"
+          ls -la
+          # Find and copy the signing keys to a separate directory for uploading
+          mkdir -p keys
+          cp *.asc keys/
+
+      - name: Upload Signing Keys
+        id: upload_keys
+        uses: actions/upload-artifact@v4
+        with:
+          name: "Signing Keys"
+          path: keys/
+
       - name: Upload Binaries
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |

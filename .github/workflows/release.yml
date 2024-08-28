@@ -1,0 +1,74 @@
+name: Create Release from Latest Builds
+
+on:
+  workflow_dispatch: # Allows manual triggering
+
+permissions:
+  contents: write
+
+env:
+  binary_name: kubectm
+  version: ${{ github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') # Only run on tagged releases
+    strategy:
+      fail-fast: true
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+    steps:
+      - name: List All Workflow Runs
+        id: list-runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runs = await github.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build.yml', // Use the file name of your build workflow
+              status: 'success', // Only get successful runs
+              per_page: 1, // Get the latest successful run
+            });
+            const run_id = runs.data.workflow_runs[0].id;
+            core.setOutput('run_id', run_id); // Set the output variable for the run ID
+          result-encoding: string
+
+      - name: Download Binary Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.list-runs.outputs.run_id }} # Use the latest successful run ID
+          name: kubectm-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: kubectm-${{ matrix.goos }}-${{ matrix.goarch }}/
+
+      - name: Download Signing Keys
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.list-runs.outputs.run_id }}
+          name: signing-keys
+          path: signing-keys/
+
+      - name: List Downloaded Files # For debugging
+        run: ls -R
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.list-runs.outputs.run_id }} # Tag with the version or a unique identifier
+          generate_release_notes: true
+          latest: true
+          files: |
+            kubectm-${{ matrix.goos }}-${{ matrix.goarch }}/kubectm-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+            kubectm-${{ matrix.goos }}-${{ matrix.goarch }}/kubectm-0.1.0-${{ matrix.goos }}-${{ matrix.goarch }}.zip.sig
+            signing-keys/*.asc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v1.4.2
+        with:
+          subject-path: kubectm-${{ matrix.goos }}-${{ matrix.goarch }}/kubectm-0.1.0-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

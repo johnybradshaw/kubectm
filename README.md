@@ -4,6 +4,8 @@
 
 `kubectm` is a CLI tool designed to simplify the management of Kubernetes configurations (`kubeconfig`) across multiple cloud providers, including Linode, AWS, Azure, and GCP. It automatically retrieves credentials, downloads available kubeconfig files, and merges them into your main `~/.kube/config` file. Additionally, it supports renaming clusters and contexts to make them more meaningful and easier to manage.
 
+It's inspired by [`kubectx`](https://github.com/ahmetb/kubectx), and works with it.
+
 ## Features
 
 - **Automatic Credential Discovery**: Automatically discovers and retrieves credentials for Linode, *(to be implemented for AWS, Azure, and GCP)*.

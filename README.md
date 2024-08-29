@@ -1,5 +1,6 @@
 # kubectm
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/f51f920bdb1142b28feae02aace1cc43)](https://app.codacy.com/gh/johnybradshaw/kubectm?utm_source=github.com&utm_medium=referral&utm_content=johnybradshaw/kubectm&utm_campaign=Badge_Grade)
 [![CodeQL](https://github.com/johnybradshaw/kubectm/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/johnybradshaw/kubectm/actions/workflows/github-code-scanning/codeql)
 
 `kubectm` is a CLI tool designed to simplify the management of Kubernetes configurations (`kubeconfig`) across multiple cloud providers, including Linode, AWS, Azure, and GCP. It automatically retrieves credentials, downloads available kubeconfig files, and merges them into your main `~/.kube/config` file. Additionally, it supports renaming clusters and contexts to make them more meaningful and easier to manage.

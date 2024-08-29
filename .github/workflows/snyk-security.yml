@@ -11,9 +11,6 @@ on:
 
   workflow_dispatch: # Triggered manually
 
-  schedule:
-    - cron: "0 0 * * *" # runs at every 12AM UTC
-
 permissions:
   contents: read # for actions/checkout to fetch code
 

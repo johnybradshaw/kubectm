@@ -8,4 +8,28 @@ updates:
   - package-ecosystem: "gomod" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
-      interval: "weekly"
+      interval: "daily"
+    labels:
+    - "dependencies" # Add labels to easily filter dependency PRs
+    commit-message:
+      prefix: "deps" # Add a prefix to commit messages for better organization
+      prefix-development: "build(deps)" # Differentiate between development and production dependencies
+    pull-request-branch-name:
+      separator: "_" # Customize the separator used in the branch name, default is "-"
+
+  - package-ecosystem: "docker" # Specifies that Dockerfile dependencies should be updated
+    directory: "/" # Location of Dockerfile, adjust if located elsewhere
+    schedule:
+      interval: "daily" # Check for updates daily
+      time: "03:00" # Run at a different time to spread the load (UTC)
+    # open-pull-requests-limit: 3 # Limit the number of open PRs for Docker updates
+    commit-message:
+      prefix: "docker" # Prefix for commit messages related to Docker updates
+    # reviewers:
+    #   - "team-slug" # Add reviewers for Docker PRs, can be different from Go module reviewers
+    # assignees:
+    #   - "user-name" # Assignees for Docker PRs
+    labels:
+      - "docker" # Labels specifically for Docker updates
+    pull-request-branch-name:
+      separator: "-" # Keep default separator for Docker updates

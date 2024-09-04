@@ -8,7 +8,7 @@ permissions:
   actions: read # To read the workflow path.
 
 env:
-  binary_name: kubectm
+  binary_name: kubectm # Name of the binary
 
 jobs:
   prepare-release:

@@ -3,11 +3,13 @@ name: Snyk Security
 on:
   push:
     branches: ["main"]
-    paths:
-      - "**.go"
+    paths-ignore:
+      - "**/*.md" # Ignore Markdown files
 
   pull_request:
     branches: ["main"]
+    paths-ignore:
+      - "**/*.md" # Ignore Markdown files
 
   workflow_dispatch: # Triggered manually
 

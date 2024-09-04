@@ -7,13 +7,12 @@ env:
 on:
   push:
     tags:
-      - 'v*'
-    paths:
-      - "**.go"
-      - ".github/workflows/build.yml"
+      - 'v*' # Only run on new tags
   pull_request:
     branches:
       - 'main' # Only run on pull requests to main
+    paths-ignore:
+          - "**/*.md" # Ignore Markdown files
   workflow_dispatch: # Triggered manually
 
 permissions: read-all

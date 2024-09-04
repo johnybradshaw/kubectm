@@ -24,28 +24,38 @@ func saveImage() (string, error) {
     // Get the user's home directory
     homeDir, err := os.UserHomeDir()
     if err != nil {
-        return "", err
+        return "", fmt.Errorf("failed to get user home directory: %v", err)
     }
+
+    // Ensure the home directory is an absolute path
+    homeDir = filepath.Clean(homeDir)
 
     // Create the ~/.kube directory if it doesn't exist
     kubeconfigDir := filepath.Join(homeDir, ".kube")
+    if !strings.HasPrefix(kubeconfigDir, homeDir) {
+        return "", fmt.Errorf("invalid directory path outside user home")
+    }
+
     err = os.MkdirAll(kubeconfigDir, os.ModePerm)
     if err != nil {
-        return "", err
+        return "", fmt.Errorf("failed to create kubeconfig directory: %v", err)
     }
 
     // Determine the path to the image file
     imagePath := filepath.Join(kubeconfigDir, "lke.png")
+    if !strings.HasPrefix(imagePath, kubeconfigDir) {
+        return "", fmt.Errorf("invalid image path outside .kube directory")
+    }
 
-    // Read the existing image file
+    // Read the existing image file safely
     existingImage, err := os.ReadFile(imagePath)
-
+    
     // If the image file doesn't exist or is different from the embedded image,
     // overwrite it with the embedded image
     if err != nil || string(existingImage) != string(lkeImage) {
         err = os.WriteFile(imagePath, lkeImage, 0600)
         if err != nil {
-            return "", err
+            return "", fmt.Errorf("failed to write image file: %v", err)
         }
         utils.InfoLogger.Printf("%s Saved Linode icon to %s", utils.Iso8601Time(), imagePath)
     }
@@ -70,20 +80,33 @@ func (e *AptakubeExtension) DeepCopyObject() runtime.Object {
     }
 }
 
-// MergeConfigs merges all the kubeconfig files in the ~/.kube directory into one
-// file. It loads the existing main kubeconfig file, then loops through all the
-// other kubeconfig files in the directory, merges them into the main config,
-// and saves the merged config back to the original file. It then deletes the
-// other kubeconfig files.
+// MergeConfigs merges all kubeconfig files in the ~/.kube directory into one main config file.
+// It ensures safe path operations and cleans up unnecessary files safely.
 func MergeConfigs() error {
+    // Get the user's home directory and ensure it's an absolute path
     homeDir, err := os.UserHomeDir()
     if err != nil {
-        return err
+        return fmt.Errorf("failed to get user home directory: %v", err)
+    }
+    homeDir = filepath.Clean(homeDir)
+
+    // Define the .kube directory and ensure it’s within the user's home
+    kubeconfigDir := filepath.Join(homeDir, ".kube")
+    kubeconfigDir = filepath.Clean(kubeconfigDir)
+
+    if !strings.HasPrefix(kubeconfigDir, homeDir) {
+        return fmt.Errorf("invalid kubeconfig directory outside user home: %s", kubeconfigDir)
     }
 
-    kubeconfigDir := filepath.Join(homeDir, ".kube")
+    // Main kubeconfig file path
     mainKubeconfigPath := filepath.Join(kubeconfigDir, "config")
+    mainKubeconfigPath = filepath.Clean(mainKubeconfigPath)
 
+    if !strings.HasPrefix(mainKubeconfigPath, kubeconfigDir) {
+        return fmt.Errorf("invalid main kubeconfig path outside .kube directory: %s", mainKubeconfigPath)
+    }
+
+    // Load the existing main kubeconfig file
     mainConfig, err := loadKubeconfig(mainKubeconfigPath)
     if err != nil {
         utils.WarnLogger.Printf("%s No existing kubeconfig found at %s, creating a new one", utils.Iso8601Time(), mainKubeconfigPath)
@@ -95,6 +118,7 @@ func MergeConfigs() error {
         return fmt.Errorf("failed to save Linode icon: %v", err)
     }
 
+    // Read all files in the .kube directory
     files, err := os.ReadDir(kubeconfigDir)
     if err != nil {
         return fmt.Errorf("failed to read kubeconfig directory: %v", err)
@@ -106,6 +130,14 @@ func MergeConfigs() error {
         // Only consider files with the .yaml extension
         if filepath.Ext(file.Name()) == ".yaml" {
             filePath := filepath.Join(kubeconfigDir, file.Name())
+            filePath = filepath.Clean(filePath)
+
+            // Ensure the file path is within the .kube directory
+            if !strings.HasPrefix(filePath, kubeconfigDir) {
+                utils.WarnLogger.Printf("%s Ignoring file outside .kube directory: %s", utils.Iso8601Time(), filePath)
+                continue
+            }
+
             utils.ActionLogger.Printf("%s Merging kubeconfig from %s", utils.Iso8601Time(), filePath)
 
             newConfig, err := loadKubeconfig(filePath)
@@ -126,6 +158,7 @@ func MergeConfigs() error {
         }
     }
 
+    // Save the merged kubeconfig
     err = saveKubeconfig(mainConfig, mainKubeconfigPath)
     if err != nil {
         return fmt.Errorf("failed to save merged kubeconfig: %v", err)
@@ -133,8 +166,14 @@ func MergeConfigs() error {
 
     utils.InfoLogger.Printf("%s Successfully merged kubeconfigs into %s", utils.Iso8601Time(), mainKubeconfigPath)
 
-    // Delete the other kubeconfig files
+    // Delete the other kubeconfig files safely
     for _, filePath := range filesToDelete {
+        // Ensure the file path is still within the .kube directory
+        if !strings.HasPrefix(filePath, kubeconfigDir) {
+            utils.WarnLogger.Printf("%s Skipping deletion of file outside .kube directory: %s", utils.Iso8601Time(), filePath)
+            continue
+        }
+
         err := os.Remove(filePath)
         if err != nil {
             utils.WarnLogger.Printf("%s Warning: failed to delete file %s: %v", utils.Iso8601Time(), filePath, err)
@@ -146,33 +185,38 @@ func MergeConfigs() error {
     return nil
 }
 
-// loadKubeconfig loads a kubeconfig file from the specified path
+// loadKubeconfig loads a kubeconfig file from the specified path safely.
 //
 // It reads the contents of the file at the specified path and uses the
 // clientcmd package to parse the contents into an api.Config object.
-//
-// If the file doesn't exist or there is an error reading the file, the
-// function returns an error. If the file exists but the contents are not
-// valid YAML or JSON, the function also returns an error.
-//
-// The function takes a string as an argument, which is the path to the
-// kubeconfig file to load.
+// Ensures the path is within the expected ~/.kube directory.
 //
 // The function returns an api.Config object and an error. If the error
 // is not nil, the returned config object is nil.
 func loadKubeconfig(path string) (*api.Config, error) {
+    // Get the user's home directory and ensure it's an absolute path
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        return nil, fmt.Errorf("failed to get user home directory: %v", err)
+    }
+    homeDir = filepath.Clean(homeDir)
+
+    // Ensure the kubeconfig path is inside the expected ~/.kube directory
+    kubeconfigDir := filepath.Join(homeDir, ".kube")
+    kubeconfigDir = filepath.Clean(kubeconfigDir)
+
+    if !strings.HasPrefix(filepath.Clean(path), kubeconfigDir) {
+        return nil, fmt.Errorf("path traversal attempt detected: %s", path)
+    }
+
     kubeconfigBytes, err := os.ReadFile(path)
     if err != nil {
-        // If the file doesn't exist or there is an error reading the file,
-        // return an error.
         return nil, fmt.Errorf("failed to read kubeconfig file at %s: %v", path, err)
     }
 
     // Parse the contents of the file into an api.Config object
     config, err := clientcmd.Load(kubeconfigBytes)
     if err != nil {
-        // If the file exists but the contents are not valid YAML or JSON,
-        // return an error.
         return nil, fmt.Errorf("failed to load kubeconfig file at %s: %v", path, err)
     }
 

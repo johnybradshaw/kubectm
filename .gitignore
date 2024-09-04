@@ -23,5 +23,9 @@
 go.work
 go.work.sum
 .slsa-goreleaser2
-kubectm
 .DS_Store
+
+# kubectm binaries
+kubectm-int
+kubectm.zip
+kubectm

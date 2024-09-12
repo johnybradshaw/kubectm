@@ -115,5 +115,5 @@ https://github.com/johnybradshaw/kubectm
 To build the binary download the repo, and run the following command:
 
 ```zsh
-❯ go build ./cmd
+❯ go build -o kubectm ./cmd
 ```

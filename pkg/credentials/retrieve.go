@@ -4,6 +4,7 @@ import (
     "errors"   // Import the errors package
     "log"
     "kubectm/pkg/utils"
+    "fmt"
 )
 
 type Credential struct {
@@ -71,4 +72,42 @@ func RetrieveAll() ([]Credential, error) {
     }
 
     return credentials, nil
+}
+
+// RetrieveSelected retrieves credentials for the specified providers.
+func RetrieveSelected(selectedProviders []string) ([]Credential, error) {
+    var creds []Credential
+
+    for _, provider := range selectedProviders {
+        switch provider {
+        case "AWS":
+            cred, err := retrieveAWSCredentials()
+            if err != nil {
+                return nil, fmt.Errorf("error retrieving AWS credentials: %v", err)
+            }
+            creds = append(creds, *cred)
+        case "Azure":
+            cred, err := retrieveAzureCredentials()
+            if err != nil {
+                return nil, fmt.Errorf("error retrieving Azure credentials: %v", err)
+            }
+            creds = append(creds, *cred)
+        case "GCP":
+            cred, err := retrieveGCPCredentials()
+            if err != nil {
+                return nil, fmt.Errorf("error retrieving GCP credentials: %v", err)
+            }
+            creds = append(creds, *cred)
+        case "Linode":
+            cred, err := retrieveLinodeCredentials()
+            if err != nil {
+                return nil, fmt.Errorf("error retrieving Linode credentials: %v", err)
+            }
+            creds = append(creds, *cred)
+        default:
+            return nil, fmt.Errorf("unsupported provider: %s", provider)
+        }
+    }
+
+    return creds, nil
 }

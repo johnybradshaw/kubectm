@@ -50,16 +50,15 @@ https://github.com/johnybradshaw/kubectm
 `)
 }
 
-// SaveSelectedCredentials saves the selected credentials to the specified file.
+// SaveSelectedCredentialProviders saves the selected credential providers to the specified file.
 //
-// It takes a slice of Credential objects as an argument, which represents
-// the selected credentials.
+// It takes a slice of provider names as an argument.
 //
 // The function creates the specified file if it doesn't exist, and overwrites
 // the file if it does exist.
 //
 // The function returns an error if there is a problem writing the file.
-func SaveSelectedCredentials(creds []credentials.Credential) error {
+func SaveSelectedCredentialProviders(providers []string) error {
     // Get the user's home directory
     homeDir, err := os.UserHomeDir()
     if err != nil {
@@ -73,33 +72,33 @@ func SaveSelectedCredentials(creds []credentials.Credential) error {
         return err
     }
 
-    // Create the selected_credentials.json file if it doesn't exist, or overwrite it if it does
-    configFile := filepath.Join(configDir, "selected_credentials.json")
+    // Create the selected_providers.json file if it doesn't exist, or overwrite it if it does
+    configFile := filepath.Join(configDir, "selected_providers.json")
     file, err := os.Create(configFile)
     if err != nil {
         return err
     }
     defer file.Close()
 
-    // Encode the selected credentials as JSON and write them to the file
+    // Encode the selected providers as JSON and write them to the file
     encoder := json.NewEncoder(file)
-    return encoder.Encode(creds)
+    return encoder.Encode(providers)
 }
 
-// LoadSelectedCredentials loads the selected credentials from the
-// ~/.kubectm/selected_credentials.json file.
+// LoadSelectedCredentialProviders loads the selected credential providers from the
+// ~/.kubectm/selected_providers.json file.
 //
-// It returns a slice of Credential objects and an error if the file
+// It returns a slice of provider names and an error if the file
 // doesn't exist or there is a problem decoding the JSON.
-func LoadSelectedCredentials() ([]credentials.Credential, error) {
+func LoadSelectedCredentialProviders() ([]string, error) {
     // Get the user's home directory
     homeDir, err := os.UserHomeDir()
     if err != nil {
         return nil, err
     }
 
-    // Construct the path to the selected_credentials.json file
-    configFile := filepath.Join(homeDir, ".kubectm", "selected_credentials.json")
+    // Construct the path to the selected_providers.json file
+    configFile := filepath.Join(homeDir, ".kubectm", "selected_providers.json")
 
     // Open the file for reading
     file, err := os.Open(configFile)
@@ -108,21 +107,19 @@ func LoadSelectedCredentials() ([]credentials.Credential, error) {
         // return an error
         return nil, err
     }
-
-    // Defer the closing of the file until after the function returns
     defer file.Close()
 
-    // Decode the JSON in the file into a slice of Credential objects
-    var creds []credentials.Credential
+    // Decode the JSON in the file into a slice of provider names
+    var providers []string
     decoder := json.NewDecoder(file)
-    err = decoder.Decode(&creds)
+    err = decoder.Decode(&providers)
     if err != nil {
         // If there is a problem decoding the JSON, return an error
         return nil, err
     }
 
-    // Return the slice of Credential objects
-    return creds, nil
+    // Return the slice of provider names
+    return providers, nil
 }
 
 func main() {
@@ -162,28 +159,42 @@ func main() {
         warnLogger.Printf("%s Stored credentials have been reset. You'll be prompted to select credentials.", iso8601Time())
     }
 
-    // Try to load previously selected credentials
-    selectedCreds, err := LoadSelectedCredentials()
-    if err != nil || len(selectedCreds) == 0 {
-        warnLogger.Printf("%s No previous credentials found or an error occurred, prompting user to select credentials.", iso8601Time())
+    // Try to load previously selected credential providers
+    selectedProviders, err := LoadSelectedCredentialProviders()
+    if err != nil || len(selectedProviders) == 0 {
+        warnLogger.Printf("%s No previous credential selections found or an error occurred, prompting user to select credentials.", iso8601Time())
         
         creds, err := credentials.RetrieveAll()
         if err != nil {
             errorLogger.Fatalf("%s Failed to retrieve credentials: %v", iso8601Time(), err)
         }
 
-        selectedCreds = ui.SelectCredentials(creds)
+        // Prompt user to select credentials
+        selectedCreds := ui.SelectCredentials(creds)
 
-        // Save the selected credentials for future use
-        err = SaveSelectedCredentials(selectedCreds)
+        // Extract provider names from selected credentials
+        selectedProviders = []string{}
+        for _, cred := range selectedCreds {
+            selectedProviders = append(selectedProviders, cred.Provider)
+        }
+
+        // Save the selected providers for future use
+        err = SaveSelectedCredentialProviders(selectedProviders)
         if err != nil {
-            errorLogger.Printf("%s Failed to save selected credentials: %v", iso8601Time(), err)
+            errorLogger.Printf("%s Failed to save selected providers: %v", iso8601Time(), err)
         }
     } else {
-        infoLogger.Printf("%s Using previously selected credentials.", iso8601Time())
+        infoLogger.Printf("%s Using previously selected credential providers.", iso8601Time())
     }
 
-    for _, cred := range selectedCreds {
+    // Retrieve credentials based on selected providers
+    creds, err := credentials.RetrieveSelected(selectedProviders)
+    if err != nil {
+        errorLogger.Fatalf("%s Failed to retrieve selected credentials: %v", iso8601Time(), err)
+    }
+
+    // Proceed with the rest of the logic using the retrieved credentials
+    for _, cred := range creds {
         infoLogger.Printf("%s Downloading kubeconfig from %s", iso8601Time(), cred.Provider)
         err := kubeconfig.DownloadConfigs([]credentials.Credential{cred})
         if err != nil {

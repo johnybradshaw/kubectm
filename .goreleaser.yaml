@@ -1,0 +1,23 @@
+project_name: kubectm
+
+release:
+  github:
+    owner: johnybradshaw
+    name: kubectm
+
+builds:
+  - main: ./cmd
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"

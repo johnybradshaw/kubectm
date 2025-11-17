@@ -1,0 +1,34 @@
+# DEPRECATED: This workflow has been consolidated into build.yml
+# Release creation is now automatic when tags are pushed
+# This file is kept for historical reference only
+#
+# Previous functionality:
+# - Manual release creation from build artifacts
+# - Now replaced by automatic release in build.yml when v* tags are pushed
+#
+# To create a release:
+# 1. Create and push a tag: git tag v1.0.0 && git push origin v1.0.0
+# 2. The build.yml workflow will automatically build and create a release
+
+name: Create Release from Latest Builds (DEPRECATED)
+
+on:
+  workflow_dispatch: # Allows manual triggering
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  binary_name: kubectm
+
+jobs:
+  deprecated-notice:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deprecation Notice
+        run: |
+          echo "⚠️ This workflow is DEPRECATED and should not be used."
+          echo "Release creation is now automatic when tags are pushed."
+          echo "Please use: git tag v1.0.0 && git push origin v1.0.0"
+          exit 1

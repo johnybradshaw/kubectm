@@ -1,4 +1,4 @@
-name: Scan & Build
+name: Build, Test & Release
 
 env:
   tag: ${{ github.ref_name }}
@@ -8,30 +8,64 @@ on:
   push:
     tags:
       - 'v*' # Only run on new tags
+    branches:
+      - 'main' # Run tests on main branch
   pull_request:
     branches:
-      - 'main' # Only run on pull requests to main
+      - 'main' # Run on pull requests to main
     paths-ignore:
-          - "**/*.md" # Ignore Markdown files
+      - "**/*.md" # Ignore Markdown files
   workflow_dispatch: # Triggered manually
 
 permissions: read-all
 
 jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+          cache: true
+
+      - name: Run Tests
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Display Coverage
+        run: go tool cover -func=coverage.out
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 30
+
   scan:
+    name: Security Scan
     permissions:
       contents: read # for actions/checkout to fetch code
       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
       actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
     runs-on: ubuntu-latest
+    needs: test
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Set up Snyk CLI to check for security issues
-        uses: snyk/actions/setup@806182742461562b67788a64410098c9d9b96adb
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Snyk CLI
+        uses: snyk/actions/setup@1d730b57b6e0f430d884a538caa90d6d93e0bf15 # v0.4.0
 
       - name: Snyk Code test
         run: snyk code test --sarif > snyk-code.sarif || true
@@ -43,18 +77,19 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      - name: Upload result to GitHub Code Scanning
+      - name: Upload SARIF to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk-code.sarif
 
   prepare-build:
+    name: Prepare Build Metadata
     runs-on: ubuntu-latest
-    needs: scan
+    needs: [test, scan]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
-      contents: write # To upload assets to release.
-      actions: read # To read the workflow path.
+      contents: write
+      actions: read
     outputs:
       commit-date: ${{ steps.ldflags.outputs.commit-date }}
       commit: ${{ steps.ldflags.outputs.commit }}
@@ -63,101 +98,152 @@ jobs:
       binary-name: ${{ env.binary_name }}
     steps:
       - name: Checkout Code
-        id: checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup Go
-        id: setup-go
-        uses: actions/setup-go@v5.0.2
+        uses: actions/setup-go@v5
         with:
           go-version-file: './go.mod'
           check-latest: true
-          cache-dependency-path: |
-            ./go.sum
-            ./go.mod
+          cache: true
 
-      - name: LDFLAGS Variables
+      - name: Extract LDFLAGS Variables
         id: ldflags
         run: |
           VERSION=$(git describe --tags --always --dirty | cut -c2-)
           echo "commit-date=$(git log --date=iso8601-strict -1 --pretty=%ct)" >> "$GITHUB_OUTPUT"
-          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT" # Use the full commit hash
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT" # Use the version from the tag
+          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tree-state=$(if git diff --quiet; then echo 'clean'; else echo 'dirty'; fi)" >> "$GITHUB_OUTPUT"
 
-      - name: Find Signing Keys
-        id: find_keys
+      - name: Find and Upload Signing Keys
         run: |
           echo "Listing signing keys:"
-          ls -la
-          # Find and copy the signing keys to a separate directory for uploading
+          ls -la *.asc || echo "No .asc files found"
           mkdir -p keys
-          cp *.asc keys/
+          cp *.asc keys/ 2>/dev/null || echo "No signing keys to copy"
 
       - name: Upload Signing Keys
-        id: upload_keys
         uses: actions/upload-artifact@v4
         with:
-          name: "signing-keys"  # Use a consistent name for uploading and downloading
+          name: "signing-keys"
           path: keys/
+          if-no-files-found: warn
 
   build:
-    needs: prepare-build # Required to get the version
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    needs: prepare-build
     strategy:
-      fail-fast: true # Don't fail the build if one job fails
-      matrix: 
-        goos: [linux, darwin, windows] # Build for linux, macos and windows
-        goarch: [amd64, arm64] # Build for amd64 and arm64
-    runs-on: ubuntu-latest 
-    if: startsWith(github.ref, 'refs/tags/v') # Only run on tags
+      fail-fast: false
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
-      id-token: write # To sign the provenance.
-      contents: write # To upload assets to release.
-      actions: read # To read the workflow path.
-      attestations: write # To sign the build provenance.
+      id-token: write
+      contents: write
+      actions: read
+      attestations: write
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Build binary
-        id: build-binary
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+          cache: true
+
+      - name: Build Binary
         run: |
-          # Linux/macOS Bash syntax
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
           go build -ldflags "-X main.Version=${{ needs.prepare-build.outputs.version }}" \
-          -o ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }} \
+          -o ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} \
           ./cmd
         shell: bash
-  
+
       - name: Setup GPG
-        id: setup-gpg
+        if: hashFiles('*.asc') != ''
         run: |
           gpg --batch --import *.asc
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
           gpg --list-keys
-  
-      - name: Sign the Binary
-        id: sign-binary
+
+      - name: Sign Binary
+        if: hashFiles('*.asc') != ''
         run: |
           gpg --batch --yes --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
           --pinentry-mode loopback \
           --detach-sign \
           --armor \
           --output \
-          ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.sig \
-          ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}
+          ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}.sig \
+          ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
 
-      - name: Upload Binaries
-        id: upload-binary
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
-            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}
-            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.sig
-      
-      - name: Output artifact ID
-        id: output-artifact-id
-        run:  echo "Artifact ID is ${{ steps.upload-binary.outputs.artifact-id }}"
+            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+            ${{ env.binary_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}.sig
+
+  release:
+    name: Create GitHub Release
+    needs: [prepare-build, build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List Downloaded Artifacts
+        run: ls -R artifacts/
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f -name "${{ env.binary_name }}-*" -exec cp {} release-assets/ \;
+          ls -lah release-assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          make_latest: true
+          generate_release_notes: true
+          files: release-assets/*
+          body: |
+            ## Release ${{ github.ref_name }}
+
+            ### What's Changed
+            Auto-generated release notes are shown below.
+
+            ### Downloads
+            Download the binary for your platform and verify the signature with the provided `.sig` file.
+
+            ### Checksums
+            ```
+            $(cd release-assets && sha256sum ${{ env.binary_name }}-* | grep -v '.sig')
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove Signatures for Attestation
+        run: |
+          rm -f release-assets/*.sig
+
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'release-assets/${{ env.binary_name }}-*'

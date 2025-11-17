@@ -259,6 +259,7 @@ func mergeKubeconfigs(dest, src *api.Config, contextName string, imagePath strin
 
     for key, context := range src.Contexts {
         originalClusterName := context.Cluster
+        shouldOverwrite := false
 
         if existingContext, exists := dest.Contexts[contextName]; exists {
             // Check if the existing context refers to the same Kubernetes instance
@@ -278,9 +279,17 @@ func mergeKubeconfigs(dest, src *api.Config, contextName string, imagePath strin
             if authInfo, exists := src.AuthInfos[context.AuthInfo]; exists {
                 dest.AuthInfos[context.AuthInfo] = authInfo
             }
+            shouldOverwrite = true
         }
 
-        uniqueContextName := makeContextNameUnique(contextName, dest.Contexts)
+        var uniqueContextName string
+        if shouldOverwrite {
+            // Use the same context name when overwriting
+            uniqueContextName = contextName
+        } else {
+            // Make the context name unique for new contexts
+            uniqueContextName = makeContextNameUnique(contextName, dest.Contexts)
+        }
 
         newContext := *context
         newContext.Cluster = originalClusterName

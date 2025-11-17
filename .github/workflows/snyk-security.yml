@@ -36,10 +36,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Snyk CLI
-        uses: snyk/actions/setup@1d730b57b6e0f430d884a538caa90d6d93e0bf15 # v0.4.0
+        uses: snyk/actions/setup@master
 
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/golang@1d730b57b6e0f430d884a538caa90d6d93e0bf15 # v0.4.0
+        uses: snyk/actions/golang@master
         continue-on-error: true # To make sure that SARIF upload gets called
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

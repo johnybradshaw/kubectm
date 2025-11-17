@@ -223,6 +223,26 @@ func loadKubeconfig(path string) (*api.Config, error) {
     return config, nil
 }
 
+// isSameCluster compares two clusters to determine if they refer to the same Kubernetes instance.
+// It compares the server URL and certificate authority data.
+func isSameCluster(cluster1, cluster2 *api.Cluster) bool {
+    if cluster1 == nil || cluster2 == nil {
+        return false
+    }
+
+    // Compare server URLs
+    if cluster1.Server != cluster2.Server {
+        return false
+    }
+
+    // Compare certificate authority data
+    if string(cluster1.CertificateAuthorityData) != string(cluster2.CertificateAuthorityData) {
+        return false
+    }
+
+    return true
+}
+
 // mergeKubeconfigs merges the source kubeconfig into the destination kubeconfig and renames contexts
 func mergeKubeconfigs(dest, src *api.Config, contextName string, imagePath string) error {
     for key, cluster := range src.Clusters {
@@ -240,9 +260,24 @@ func mergeKubeconfigs(dest, src *api.Config, contextName string, imagePath strin
     for key, context := range src.Contexts {
         originalClusterName := context.Cluster
 
-        if _, exists := dest.Contexts[contextName]; exists {
-            utils.ActionLogger.Printf("%s Context %s already exists, skipping...", utils.Iso8601Time(), color.New(color.Bold).Sprint(contextName))
-            continue
+        if existingContext, exists := dest.Contexts[contextName]; exists {
+            // Check if the existing context refers to the same Kubernetes instance
+            srcCluster := src.Clusters[context.Cluster]
+            destCluster := dest.Clusters[existingContext.Cluster]
+
+            if isSameCluster(srcCluster, destCluster) {
+                utils.ActionLogger.Printf("%s Context %s already exists for the same cluster, skipping...", utils.Iso8601Time(), color.New(color.Bold).Sprint(contextName))
+                continue
+            }
+
+            // Different cluster with same name - overwrite the existing context
+            utils.ActionLogger.Printf("%s Context %s exists but refers to a different cluster, overwriting...", utils.Iso8601Time(), color.New(color.Bold).Sprint(contextName))
+
+            // Update the cluster and auth info
+            dest.Clusters[originalClusterName] = src.Clusters[context.Cluster]
+            if authInfo, exists := src.AuthInfos[context.AuthInfo]; exists {
+                dest.AuthInfos[context.AuthInfo] = authInfo
+            }
         }
 
         uniqueContextName := makeContextNameUnique(contextName, dest.Contexts)

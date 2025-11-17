@@ -13,6 +13,11 @@ import (
     "kubectm/pkg/utils"  // Import the utils package
 )
 
+// linodeAPIBaseURL is the base URL for the Linode API v4.
+// API Documentation: https://techdocs.akamai.com/linode-api/reference/api
+// LKE endpoints used:
+//   - GET /lke/clusters - List all LKE clusters
+//   - GET /lke/clusters/{clusterId}/kubeconfig - Get cluster kubeconfig (base64 encoded)
 const linodeAPIBaseURL = "https://api.linode.com/v4"
 
 type LinodeCluster struct {

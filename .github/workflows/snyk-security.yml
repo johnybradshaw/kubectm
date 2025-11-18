@@ -1,19 +1,19 @@
 name: Snyk Security Scan
 
 on:
-  push:
-    branches: ["main"]
-    paths-ignore:
-      - "**/*.md" # Ignore Markdown files
+  # push:
+  #   branches: ["main"]
+  #   paths-ignore:
+  #     - "**/*.md" # Ignore Markdown files
 
-  pull_request:
-    branches: ["main"]
-    paths-ignore:
-      - "**/*.md" # Ignore Markdown files
+  # pull_request:
+  #   branches: ["main"]
+  #   paths-ignore:
+  #     - "**/*.md" # Ignore Markdown files
 
-  schedule:
-    # Run daily at 2 AM UTC
-    - cron: '0 2 * * *'
+  # schedule:
+  #   # Run daily at 2 AM UTC
+  #   - cron: '0 2 * * *'
 
   workflow_dispatch: # Triggered manually
 

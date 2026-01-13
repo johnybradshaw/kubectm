@@ -1,35 +1,8 @@
 # CLAUDE.md
 
-This file provides guidance for Claude Code when working on this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
-
-**kubectm** is a Go CLI tool that simplifies Kubernetes kubeconfig management across multiple cloud providers. It automatically retrieves credentials, downloads kubeconfig files from cloud providers, and merges them into `~/.kube/config`.
-
-## Architecture
-
-```
-kubectm/
-├── cmd/main.go              # CLI entry point, flag parsing, main workflow
-├── pkg/
-│   ├── credentials/         # Cloud provider credential retrieval
-│   │   ├── retrieve.go      # Main credential retrieval logic
-│   │   ├── aws.go           # AWS credential handling (stub)
-│   │   ├── azure.go         # Azure credential handling (stub)
-│   │   ├── gcp.go           # GCP credential handling (stub)
-│   │   └── linode.go        # Linode credential handling (implemented)
-│   ├── kubeconfig/          # Kubeconfig operations
-│   │   ├── download.go      # Download kubeconfigs from providers
-│   │   ├── merge.go         # Merge kubeconfigs into ~/.kube/config
-│   │   ├── rename.go        # Rename clusters/contexts
-│   │   └── linode.go        # Linode-specific kubeconfig handling
-│   ├── ui/
-│   │   └── prompt.go        # Interactive credential selection UI
-│   └── utils/
-│       └── logging.go       # Logging utilities and credential obfuscation
-```
-
-## Build Commands
+## Build and Test Commands
 
 ```bash
 # Build the binary
@@ -38,14 +11,58 @@ go build -o kubectm ./cmd
 # Run tests with coverage
 go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
-# View coverage
+# Display coverage report
 go tool cover -func=coverage.out
+
+# Run a single test file
+go test -v ./pkg/kubeconfig/merge_test.go ./pkg/kubeconfig/merge.go
+
+# Run tests matching a pattern
+go test -v -run TestMerge ./pkg/kubeconfig/...
 
 # Cross-compile for different platforms
 GOOS=linux GOARCH=amd64 go build -o kubectm-linux-amd64 ./cmd
 GOOS=darwin GOARCH=arm64 go build -o kubectm-darwin-arm64 ./cmd
 GOOS=windows GOARCH=amd64 go build -o kubectm-windows-amd64.exe ./cmd
 ```
+
+## Architecture Overview
+
+kubectm is a CLI tool that downloads and merges Kubernetes configurations from cloud providers into `~/.kube/config`.
+
+### Package Structure
+
+- **cmd/main.go** - Entry point. Handles CLI flags, loads/saves selected providers to `~/.kubectm/selected_providers.json`, orchestrates credential retrieval and kubeconfig operations.
+
+- **pkg/credentials/** - Provider credential discovery
+  - `retrieve.go` - Central dispatcher with `RetrieveAll()` and `RetrieveSelected()` functions
+  - `linode.go` - Reads from `LINODE_ACCESS_TOKEN` env var or `~/.config/linode-cli` config file
+  - `aws.go`, `azure.go`, `gcp.go` - Stub implementations (not yet functional)
+
+- **pkg/kubeconfig/** - Kubeconfig operations
+  - `download.go` - Dispatcher that routes to provider-specific downloaders
+  - `linode.go` - Calls Linode API (`/lke/clusters` and `/lke/clusters/{id}/kubeconfig`) to fetch kubeconfigs
+  - `merge.go` - Merges `.yaml` files from `~/.kube/` into the main config, handles context naming conflicts, adds Aptakube extension for Linode icon
+  - `lke.png` - Embedded Linode icon (via `//go:embed`)
+
+- **pkg/ui/prompt.go** - Interactive multi-select for credential providers using `survey/v2`
+
+- **pkg/utils/logging.go** - Shared loggers (`InfoLogger`, `WarnLogger`, `ErrorLogger`, `ActionLogger`) with colored prefixes
+
+### Data Flow
+
+1. On first run: discover all available credentials → prompt user to select → save selection
+2. On subsequent runs: load saved provider selection → retrieve credentials for those providers
+3. For each provider: download kubeconfigs to `~/.kube/{label}-kubeconfig.yaml`
+4. Merge all `.yaml` files into `~/.kube/config`, then delete the temporary files
+
+### Linode API Integration
+
+The Linode provider uses API v4 (`https://api.linode.com/v4`):
+- `GET /lke/clusters` - List all LKE clusters
+- `GET /lke/clusters/{clusterId}/kubeconfig` - Get base64-encoded kubeconfig
+
+Authentication via Bearer token from either `LINODE_ACCESS_TOKEN` env var or `linode-cli` config.
 
 ## Key Dependencies
 
@@ -54,37 +71,22 @@ GOOS=windows GOARCH=amd64 go build -o kubectm-windows-amd64.exe ./cmd
 - `github.com/AlecAivazis/survey/v2` - Interactive prompts
 - `github.com/fatih/color` - Colored terminal output
 
-## Development Notes
+## Key Patterns
 
-### Supported Cloud Providers
+- Path traversal protection: All file operations in `merge.go` validate paths are within `~/.kube/`
+- Credential obfuscation: `utils.ObfuscateCredential()` masks sensitive values in logs
+- Context conflict resolution: When merging, same-cluster contexts are skipped; different-cluster same-name contexts are overwritten
+- Version injection: Build with `-ldflags "-X main.Version=..."` for release versioning
+- Logging: Use the predefined loggers with ISO 8601 timestamps
+- Error Handling: Return errors rather than fatal logging in package functions; let main handle fatal errors
 
-- **Linode (LKE)**: Fully implemented - reads from `LINODE_API_TOKEN` env var or `linode-cli` config
-- **AWS, Azure, GCP**: Stub implementations only - not yet functional
-
-### Configuration Storage
-
-- Selected providers saved to: `~/.kubectm/selected_providers.json`
-- Credentials path: `~/.kubectm/selected_credentials.json`
-
-### CLI Flags
+## CLI Flags
 
 - `-h, --help`: Show help message
 - `-v, --version`: Show version
 - `--reset-creds`: Reset stored credentials and prompt for new ones
 
-### Code Patterns
-
-1. **Logging**: Use the predefined loggers (`infoLogger`, `warnLogger`, `errorLogger`, `actionLogger`) with ISO 8601 timestamps
-2. **Credentials**: The `Credential` struct has `Provider` (string) and `Details` (map[string]string) fields
-3. **Error Handling**: Return errors rather than fatal logging in package functions; let main handle fatal errors
-
-### Testing
-
-Tests use Go's standard testing package. Test files are colocated with source files:
-- `pkg/kubeconfig/linode_test.go`
-- `pkg/kubeconfig/merge_test.go`
-
-### Release Process
+## Release Process
 
 Releases are automated via GitHub Actions when a version tag (`v*`) is pushed:
 1. Tests run first

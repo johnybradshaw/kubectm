@@ -7,6 +7,19 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 )
 
+const (
+	testServerURL        = "https://example.com:6443"
+	testServerURL2       = "https://test.example.com:6443"
+	testCAData           = "ca-data-123"
+	testCAData2          = "test-ca-data"
+	testClusterNameMerge = "test-cluster"
+	testUserName         = "test-user"
+	testToken            = "test-token"
+	testContextName      = "test-context"
+	testContextName1     = "test-context-1"
+	testIconPath         = "/path/to/icon.png"
+)
+
 // TestIsSameCluster tests the isSameCluster function with various scenarios
 func TestIsSameCluster(t *testing.T) {
 	tests := []struct {
@@ -25,14 +38,14 @@ func TestIsSameCluster(t *testing.T) {
 			name:     "first cluster is nil",
 			cluster1: nil,
 			cluster2: &api.Cluster{
-				Server: "https://example.com:6443",
+				Server: testServerURL,
 			},
 			want: false,
 		},
 		{
 			name: "second cluster is nil",
 			cluster1: &api.Cluster{
-				Server: "https://example.com:6443",
+				Server: testServerURL,
 			},
 			cluster2: nil,
 			want:     false,
@@ -40,12 +53,12 @@ func TestIsSameCluster(t *testing.T) {
 		{
 			name: "identical clusters - same server and CA",
 			cluster1: &api.Cluster{
-				Server:                   "https://example.com:6443",
-				CertificateAuthorityData: []byte("ca-data-123"),
+				Server:                   testServerURL,
+				CertificateAuthorityData: []byte(testCAData),
 			},
 			cluster2: &api.Cluster{
-				Server:                   "https://example.com:6443",
-				CertificateAuthorityData: []byte("ca-data-123"),
+				Server:                   testServerURL,
+				CertificateAuthorityData: []byte(testCAData),
 			},
 			want: true,
 		},
@@ -53,22 +66,22 @@ func TestIsSameCluster(t *testing.T) {
 			name: "different server URLs",
 			cluster1: &api.Cluster{
 				Server:                   "https://example1.com:6443",
-				CertificateAuthorityData: []byte("ca-data-123"),
+				CertificateAuthorityData: []byte(testCAData),
 			},
 			cluster2: &api.Cluster{
 				Server:                   "https://example2.com:6443",
-				CertificateAuthorityData: []byte("ca-data-123"),
+				CertificateAuthorityData: []byte(testCAData),
 			},
 			want: false,
 		},
 		{
 			name: "different CA data",
 			cluster1: &api.Cluster{
-				Server:                   "https://example.com:6443",
-				CertificateAuthorityData: []byte("ca-data-123"),
+				Server:                   testServerURL,
+				CertificateAuthorityData: []byte(testCAData),
 			},
 			cluster2: &api.Cluster{
-				Server:                   "https://example.com:6443",
+				Server:                   testServerURL,
 				CertificateAuthorityData: []byte("ca-data-456"),
 			},
 			want: false,
@@ -76,11 +89,11 @@ func TestIsSameCluster(t *testing.T) {
 		{
 			name: "same server but one has no CA data",
 			cluster1: &api.Cluster{
-				Server:                   "https://example.com:6443",
-				CertificateAuthorityData: []byte("ca-data-123"),
+				Server:                   testServerURL,
+				CertificateAuthorityData: []byte(testCAData),
 			},
 			cluster2: &api.Cluster{
-				Server:                   "https://example.com:6443",
+				Server:                   testServerURL,
 				CertificateAuthorityData: nil,
 			},
 			want: false,
@@ -88,11 +101,11 @@ func TestIsSameCluster(t *testing.T) {
 		{
 			name: "both have same server and no CA data",
 			cluster1: &api.Cluster{
-				Server:                   "https://example.com:6443",
+				Server:                   testServerURL,
 				CertificateAuthorityData: nil,
 			},
 			cluster2: &api.Cluster{
-				Server:                   "https://example.com:6443",
+				Server:                   testServerURL,
 				CertificateAuthorityData: nil,
 			},
 			want: true,
@@ -100,11 +113,11 @@ func TestIsSameCluster(t *testing.T) {
 		{
 			name: "empty CA data vs nil CA data",
 			cluster1: &api.Cluster{
-				Server:                   "https://example.com:6443",
+				Server:                   testServerURL,
 				CertificateAuthorityData: []byte{},
 			},
 			cluster2: &api.Cluster{
-				Server:                   "https://example.com:6443",
+				Server:                   testServerURL,
 				CertificateAuthorityData: nil,
 			},
 			want: true,
@@ -121,17 +134,54 @@ func TestIsSameCluster(t *testing.T) {
 	}
 }
 
+// createTestConfig creates a test kubeconfig with the specified parameters
+func createTestConfig(clusterName, serverURL, caData, userName, token, ctxName string, extensions map[string]runtime.Object) *api.Config {
+	config := &api.Config{
+		Clusters: map[string]*api.Cluster{
+			clusterName: {
+				Server:                   serverURL,
+				CertificateAuthorityData: []byte(caData),
+			},
+		},
+		AuthInfos: map[string]*api.AuthInfo{
+			userName: {Token: token},
+		},
+		Contexts: map[string]*api.Context{
+			ctxName: {
+				Cluster:    clusterName,
+				AuthInfo:   userName,
+				Extensions: extensions,
+			},
+		},
+	}
+	return config
+}
+
+// verifyAptakubeExtension checks that all contexts have the aptakube extension
+func verifyAptakubeExtension(t *testing.T, config *api.Config) {
+	t.Helper()
+	for _, context := range config.Contexts {
+		if context.Extensions == nil {
+			t.Error("Expected context to have extensions, got nil")
+			continue
+		}
+		if _, exists := context.Extensions["aptakube"]; !exists {
+			t.Error("Expected context to have aptakube extension")
+		}
+	}
+}
+
 // TestMergeKubeconfigs tests the mergeKubeconfigs function
 func TestMergeKubeconfigs(t *testing.T) {
 	tests := []struct {
-		name            string
-		destConfig      *api.Config
-		srcConfig       *api.Config
-		contextName     string
-		imagePath       string
+		name             string
+		destConfig       *api.Config
+		srcConfig        *api.Config
+		contextName      string
+		imagePath        string
 		expectedContexts int
-		shouldOverwrite bool
-		description     string
+		shouldOverwrite  bool
+		description      string
 	}{
 		{
 			name: "merge into empty config",
@@ -140,125 +190,31 @@ func TestMergeKubeconfigs(t *testing.T) {
 				AuthInfos: make(map[string]*api.AuthInfo),
 				Contexts:  make(map[string]*api.Context),
 			},
-			srcConfig: &api.Config{
-				Clusters: map[string]*api.Cluster{
-					"test-cluster": {
-						Server:                   "https://test.example.com:6443",
-						CertificateAuthorityData: []byte("test-ca-data"),
-					},
-				},
-				AuthInfos: map[string]*api.AuthInfo{
-					"test-user": {
-						Token: "test-token",
-					},
-				},
-				Contexts: map[string]*api.Context{
-					"test-context": {
-						Cluster:  "test-cluster",
-						AuthInfo: "test-user",
-					},
-				},
-			},
-			contextName:      "test-context",
-			imagePath:        "/path/to/icon.png",
+			srcConfig:        createTestConfig(testClusterNameMerge, testServerURL2, testCAData2, testUserName, testToken, testContextName, nil),
+			contextName:      testContextName,
+			imagePath:        testIconPath,
 			expectedContexts: 1,
 			shouldOverwrite:  false,
 			description:      "should add new context to empty config",
 		},
 		{
 			name: "skip same cluster with same context name",
-			destConfig: &api.Config{
-				Clusters: map[string]*api.Cluster{
-					"test-cluster": {
-						Server:                   "https://test.example.com:6443",
-						CertificateAuthorityData: []byte("test-ca-data"),
-					},
-				},
-				AuthInfos: map[string]*api.AuthInfo{
-					"test-user": {
-						Token: "test-token",
-					},
-				},
-				Contexts: map[string]*api.Context{
-					"test-context": {
-						Cluster:  "test-cluster",
-						AuthInfo: "test-user",
-						Extensions: map[string]runtime.Object{
-							"aptakube": &AptakubeExtension{
-								IconURL: "/existing/icon.png",
-							},
-						},
-					},
-				},
-			},
-			srcConfig: &api.Config{
-				Clusters: map[string]*api.Cluster{
-					"test-cluster": {
-						Server:                   "https://test.example.com:6443",
-						CertificateAuthorityData: []byte("test-ca-data"),
-					},
-				},
-				AuthInfos: map[string]*api.AuthInfo{
-					"test-user": {
-						Token: "test-token",
-					},
-				},
-				Contexts: map[string]*api.Context{
-					"test-context": {
-						Cluster:  "test-cluster",
-						AuthInfo: "test-user",
-					},
-				},
-			},
-			contextName:      "test-context",
-			imagePath:        "/path/to/icon.png",
+			destConfig: createTestConfig(testClusterNameMerge, testServerURL2, testCAData2, testUserName, testToken, testContextName,
+				map[string]runtime.Object{"aptakube": &AptakubeExtension{IconURL: "/existing/icon.png"}}),
+			srcConfig:        createTestConfig(testClusterNameMerge, testServerURL2, testCAData2, testUserName, testToken, testContextName, nil),
+			contextName:      testContextName,
+			imagePath:        testIconPath,
 			expectedContexts: 1,
 			shouldOverwrite:  false,
 			description:      "should skip when same cluster already exists",
 		},
 		{
-			name: "overwrite different cluster with same context name",
-			destConfig: &api.Config{
-				Clusters: map[string]*api.Cluster{
-					"old-cluster": {
-						Server:                   "https://old.example.com:6443",
-						CertificateAuthorityData: []byte("old-ca-data"),
-					},
-				},
-				AuthInfos: map[string]*api.AuthInfo{
-					"old-user": {
-						Token: "old-token",
-					},
-				},
-				Contexts: map[string]*api.Context{
-					"test-context": {
-						Cluster:  "old-cluster",
-						AuthInfo: "old-user",
-					},
-				},
-			},
-			srcConfig: &api.Config{
-				Clusters: map[string]*api.Cluster{
-					"new-cluster": {
-						Server:                   "https://new.example.com:6443",
-						CertificateAuthorityData: []byte("new-ca-data"),
-					},
-				},
-				AuthInfos: map[string]*api.AuthInfo{
-					"new-user": {
-						Token: "new-token",
-					},
-				},
-				Contexts: map[string]*api.Context{
-					"test-context": {
-						Cluster:  "new-cluster",
-						AuthInfo: "new-user",
-					},
-				},
-			},
-			contextName:      "test-context",
-			imagePath:        "/path/to/icon.png",
-			expectedContexts: 2, // Both test-context and test-context-1 should exist due to uniqueness
+			name:             "overwrite different cluster with same context name",
+			destConfig:       createTestConfig("old-cluster", "https://old.example.com:6443", "old-ca-data", "old-user", "old-token", testContextName, nil),
+			srcConfig:        createTestConfig("new-cluster", "https://new.example.com:6443", "new-ca-data", "new-user", "new-token", testContextName, nil),
+			contextName:      testContextName,
+			imagePath:        testIconPath,
+			expectedContexts: 2,
 			shouldOverwrite:  true,
 			description:      "should overwrite when different cluster has same context name",
 		},
@@ -271,21 +227,11 @@ func TestMergeKubeconfigs(t *testing.T) {
 				t.Fatalf("mergeKubeconfigs() error = %v", err)
 			}
 
-			// Check the number of contexts
 			if len(tt.destConfig.Contexts) < 1 {
 				t.Errorf("Expected at least 1 context, got %d", len(tt.destConfig.Contexts))
 			}
 
-			// Verify that the context has the Aptakube extension
-			for _, context := range tt.destConfig.Contexts {
-				if context.Extensions == nil {
-					t.Error("Expected context to have extensions, got nil")
-					continue
-				}
-				if _, exists := context.Extensions["aptakube"]; !exists {
-					t.Error("Expected context to have aptakube extension")
-				}
-			}
+			verifyAptakubeExtension(t, tt.destConfig)
 		})
 	}
 }
@@ -300,30 +246,30 @@ func TestMakeContextNameUnique(t *testing.T) {
 	}{
 		{
 			name:             "no existing contexts",
-			contextName:      "test-context",
+			contextName:      testContextName,
 			existingContexts: make(map[string]*api.Context),
-			want:             "test-context",
+			want:             testContextName,
 		},
 		{
 			name:        "context name already exists",
-			contextName: "test-context",
+			contextName: testContextName,
 			existingContexts: map[string]*api.Context{
-				"test-context": {
-					Cluster:  "test-cluster",
-					AuthInfo: "test-user",
+				testContextName: {
+					Cluster:  testClusterNameMerge,
+					AuthInfo: testUserName,
 				},
 			},
-			want: "test-context-1",
+			want: testContextName1,
 		},
 		{
 			name:        "multiple existing contexts with same name",
-			contextName: "test-context",
+			contextName: testContextName,
 			existingContexts: map[string]*api.Context{
-				"test-context": {
-					Cluster:  "test-cluster",
-					AuthInfo: "test-user",
+				testContextName: {
+					Cluster:  testClusterNameMerge,
+					AuthInfo: testUserName,
 				},
-				"test-context-1": {
+				testContextName1: {
 					Cluster:  "test-cluster-2",
 					AuthInfo: "test-user-2",
 				},
@@ -332,18 +278,18 @@ func TestMakeContextNameUnique(t *testing.T) {
 		},
 		{
 			name:        "gaps in numbering",
-			contextName: "test-context",
+			contextName: testContextName,
 			existingContexts: map[string]*api.Context{
-				"test-context": {
-					Cluster:  "test-cluster",
-					AuthInfo: "test-user",
+				testContextName: {
+					Cluster:  testClusterNameMerge,
+					AuthInfo: testUserName,
 				},
 				"test-context-3": {
 					Cluster:  "test-cluster-3",
 					AuthInfo: "test-user-3",
 				},
 			},
-			want: "test-context-1", // Should use first available number, not jump to 4
+			want: testContextName1, // Should use first available number, not jump to 4
 		},
 	}
 

@@ -12,6 +12,12 @@ import (
 	"kubectm/pkg/credentials"
 )
 
+const (
+	testContentType     = "Content-Type"
+	testApplicationJSON = "application/json"
+	testClusterName     = "test-cluster"
+)
+
 // TestGetLinodeClusters tests the getLinodeClusters function
 func TestGetLinodeClusters(t *testing.T) {
 	tests := []struct {
@@ -90,8 +96,8 @@ func TestGetLinodeClusters(t *testing.T) {
 			// Create a mock HTTP server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Verify request headers
-				if r.Header.Get("Content-Type") != "application/json" {
-					t.Errorf("Expected Content-Type: application/json, got %s", r.Header.Get("Content-Type"))
+				if r.Header.Get(testContentType) != testApplicationJSON {
+					t.Errorf("Expected %s: %s, got %s", testContentType, testApplicationJSON, r.Header.Get(testContentType))
 				}
 
 				authHeader := r.Header.Get("Authorization")
@@ -101,7 +107,7 @@ func TestGetLinodeClusters(t *testing.T) {
 
 				// Set status code and write response
 				w.WriteHeader(tt.statusCode)
-				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set(testContentType, testApplicationJSON)
 				json.NewEncoder(w).Encode(tt.responseBody)
 			}))
 			defer server.Close()
@@ -183,8 +189,8 @@ users:
 			// Create a mock HTTP server
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Verify request headers
-				if r.Header.Get("Content-Type") != "application/json" {
-					t.Errorf("Expected Content-Type: application/json, got %s", r.Header.Get("Content-Type"))
+				if r.Header.Get(testContentType) != testApplicationJSON {
+					t.Errorf("Expected %s: %s, got %s", testContentType, testApplicationJSON, r.Header.Get(testContentType))
 				}
 
 				authHeader := r.Header.Get("Authorization")
@@ -194,7 +200,7 @@ users:
 
 				// Set status code and write response
 				w.WriteHeader(tt.statusCode)
-				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set(testContentType, testApplicationJSON)
 
 				if tt.statusCode == http.StatusOK {
 					// Encode the kubeconfig in base64
@@ -216,12 +222,40 @@ users:
 	}
 }
 
+// verifySavedKubeconfig checks that the kubeconfig file was created correctly
+func verifySavedKubeconfig(t *testing.T, expectedPath, expectedContent string) {
+	t.Helper()
+
+	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
+		t.Errorf("Expected file to be created at %s", expectedPath)
+		return
+	}
+
+	content, err := os.ReadFile(expectedPath)
+	if err != nil {
+		t.Errorf("Failed to read saved file: %v", err)
+		return
+	}
+
+	if string(content) != expectedContent {
+		t.Errorf("File content mismatch. Expected:\n%s\n\nGot:\n%s", expectedContent, string(content))
+	}
+
+	info, err := os.Stat(expectedPath)
+	if err != nil {
+		t.Errorf("Failed to stat file: %v", err)
+		return
+	}
+
+	if info.Mode().Perm() != 0600 {
+		t.Errorf("Expected file permissions 0600, got %o", info.Mode().Perm())
+	}
+}
+
 // TestSaveKubeconfigToFile tests the saveKubeconfigToFile function
 func TestSaveKubeconfigToFile(t *testing.T) {
-	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
-	// Mock the home directory
 	originalHome := os.Getenv("HOME")
 	os.Setenv("HOME", tempDir)
 	defer os.Setenv("HOME", originalHome)
@@ -235,7 +269,7 @@ func TestSaveKubeconfigToFile(t *testing.T) {
 	}{
 		{
 			name:         "save valid kubeconfig",
-			clusterLabel: "test-cluster",
+			clusterLabel: testClusterName,
 			kubeconfig: `apiVersion: v1
 kind: Config
 clusters:
@@ -274,34 +308,8 @@ kind: Config
 			}
 
 			if !tt.expectedError {
-				// Verify the file was created
 				expectedPath := filepath.Join(tempDir, ".kube", tt.clusterLabel+"-kubeconfig.yaml")
-				if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
-					t.Errorf("Expected file to be created at %s", expectedPath)
-					return
-				}
-
-				// Verify the file contents
-				content, err := os.ReadFile(expectedPath)
-				if err != nil {
-					t.Errorf("Failed to read saved file: %v", err)
-					return
-				}
-
-				if string(content) != tt.kubeconfig {
-					t.Errorf("File content mismatch. Expected:\n%s\n\nGot:\n%s", tt.kubeconfig, string(content))
-				}
-
-				// Verify file permissions (should be 0600)
-				info, err := os.Stat(expectedPath)
-				if err != nil {
-					t.Errorf("Failed to stat file: %v", err)
-					return
-				}
-
-				if info.Mode().Perm() != 0600 {
-					t.Errorf("Expected file permissions 0600, got %o", info.Mode().Perm())
-				}
+				verifySavedKubeconfig(t, expectedPath, tt.kubeconfig)
 			}
 		})
 	}
@@ -359,14 +367,14 @@ func TestLinodeAPICompatibility(t *testing.T) {
 	// Verify the cluster struct has required fields
 	cluster := LinodeCluster{
 		ID:    123,
-		Label: "test-cluster",
+		Label: testClusterName,
 	}
 
 	if cluster.ID != 123 {
 		t.Errorf("LinodeCluster.ID not working correctly")
 	}
 
-	if cluster.Label != "test-cluster" {
+	if cluster.Label != testClusterName {
 		t.Errorf("LinodeCluster.Label not working correctly")
 	}
 

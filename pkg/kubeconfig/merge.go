@@ -14,47 +14,49 @@ import (
     _ "embed"
 )
 
+const (
+    errHomeDirFmt = "failed to get user home directory: %v"
+)
+
 //go:embed lke.png
 var lkeImage []byte
+
+// getKubeDir returns the user's home directory and .kube directory path
+func getKubeDir() (homeDir, kubeDir string, err error) {
+    homeDir, err = os.UserHomeDir()
+    if err != nil {
+        return "", "", fmt.Errorf(errHomeDirFmt, err)
+    }
+    homeDir = filepath.Clean(homeDir)
+    kubeDir = filepath.Clean(filepath.Join(homeDir, ".kube"))
+    return homeDir, kubeDir, nil
+}
 
 // saveImage saves the LKE image to ~/.kube/lke.png
 //
 // It returns the path to the saved image and an error if saving fails.
 func saveImage() (string, error) {
-    // Get the user's home directory
-    homeDir, err := os.UserHomeDir()
+    homeDir, kubeconfigDir, err := getKubeDir()
     if err != nil {
-        return "", fmt.Errorf("failed to get user home directory: %v", err)
+        return "", err
     }
 
-    // Ensure the home directory is an absolute path
-    homeDir = filepath.Clean(homeDir)
-
-    // Create the ~/.kube directory if it doesn't exist
-    kubeconfigDir := filepath.Join(homeDir, ".kube")
     if !strings.HasPrefix(kubeconfigDir, homeDir) {
         return "", fmt.Errorf("invalid directory path outside user home")
     }
 
-    err = os.MkdirAll(kubeconfigDir, os.ModePerm)
-    if err != nil {
+    if err := os.MkdirAll(kubeconfigDir, os.ModePerm); err != nil {
         return "", fmt.Errorf("failed to create kubeconfig directory: %v", err)
     }
 
-    // Determine the path to the image file
     imagePath := filepath.Join(kubeconfigDir, "lke.png")
     if !strings.HasPrefix(imagePath, kubeconfigDir) {
         return "", fmt.Errorf("invalid image path outside .kube directory")
     }
 
-    // Read the existing image file safely
-    existingImage, err := os.ReadFile(imagePath)
-    
-    // If the image file doesn't exist or is different from the embedded image,
-    // overwrite it with the embedded image
-    if err != nil || string(existingImage) != string(lkeImage) {
-        err = os.WriteFile(imagePath, lkeImage, 0600)
-        if err != nil {
+    existingImage, readErr := os.ReadFile(imagePath)
+    if readErr != nil || string(existingImage) != string(lkeImage) {
+        if err := os.WriteFile(imagePath, lkeImage, 0600); err != nil {
             return "", fmt.Errorf("failed to write image file: %v", err)
         }
         utils.InfoLogger.Printf("%s Saved Linode icon to %s", utils.Iso8601Time(), imagePath)
@@ -80,33 +82,63 @@ func (e *AptakubeExtension) DeepCopyObject() runtime.Object {
     }
 }
 
+// processYAMLFile processes a single YAML kubeconfig file and adds it to the main config
+func processYAMLFile(mainConfig *api.Config, kubeconfigDir, fileName, imagePath string) (string, error) {
+    filePath := filepath.Clean(filepath.Join(kubeconfigDir, fileName))
+
+    if !strings.HasPrefix(filePath, kubeconfigDir) {
+        utils.WarnLogger.Printf("%s Ignoring file outside .kube directory: %s", utils.Iso8601Time(), filePath)
+        return "", nil
+    }
+
+    utils.ActionLogger.Printf("%s Merging kubeconfig from %s", utils.Iso8601Time(), filePath)
+
+    newConfig, err := loadKubeconfig(filePath)
+    if err != nil {
+        return "", fmt.Errorf("failed to load kubeconfig from %s: %v", filePath, err)
+    }
+
+    contextName := strings.TrimSuffix(fileName, "-kubeconfig.yaml")
+    if err := mergeKubeconfigs(mainConfig, newConfig, contextName, imagePath); err != nil {
+        return "", fmt.Errorf("failed to merge kubeconfig from %s: %v", filePath, err)
+    }
+
+    return filePath, nil
+}
+
+// cleanupMergedFiles removes the temporary kubeconfig files that have been merged
+func cleanupMergedFiles(filesToDelete []string, kubeconfigDir string) {
+    for _, filePath := range filesToDelete {
+        if !strings.HasPrefix(filePath, kubeconfigDir) {
+            utils.WarnLogger.Printf("%s Skipping deletion of file outside .kube directory: %s", utils.Iso8601Time(), filePath)
+            continue
+        }
+
+        if err := os.Remove(filePath); err != nil {
+            utils.WarnLogger.Printf("%s Warning: failed to delete file %s: %v", utils.Iso8601Time(), filePath, err)
+        } else {
+            utils.InfoLogger.Printf("%s Deleted file %s", utils.Iso8601Time(), filePath)
+        }
+    }
+}
+
 // MergeConfigs merges all kubeconfig files in the ~/.kube directory into one main config file.
 // It ensures safe path operations and cleans up unnecessary files safely.
 func MergeConfigs() error {
-    // Get the user's home directory and ensure it's an absolute path
-    homeDir, err := os.UserHomeDir()
+    homeDir, kubeconfigDir, err := getKubeDir()
     if err != nil {
-        return fmt.Errorf("failed to get user home directory: %v", err)
+        return err
     }
-    homeDir = filepath.Clean(homeDir)
-
-    // Define the .kube directory and ensure it’s within the user's home
-    kubeconfigDir := filepath.Join(homeDir, ".kube")
-    kubeconfigDir = filepath.Clean(kubeconfigDir)
 
     if !strings.HasPrefix(kubeconfigDir, homeDir) {
         return fmt.Errorf("invalid kubeconfig directory outside user home: %s", kubeconfigDir)
     }
 
-    // Main kubeconfig file path
-    mainKubeconfigPath := filepath.Join(kubeconfigDir, "config")
-    mainKubeconfigPath = filepath.Clean(mainKubeconfigPath)
-
+    mainKubeconfigPath := filepath.Clean(filepath.Join(kubeconfigDir, "config"))
     if !strings.HasPrefix(mainKubeconfigPath, kubeconfigDir) {
         return fmt.Errorf("invalid main kubeconfig path outside .kube directory: %s", mainKubeconfigPath)
     }
 
-    // Load the existing main kubeconfig file
     mainConfig, err := loadKubeconfig(mainKubeconfigPath)
     if err != nil {
         utils.WarnLogger.Printf("%s No existing kubeconfig found at %s, creating a new one", utils.Iso8601Time(), mainKubeconfigPath)
@@ -118,69 +150,31 @@ func MergeConfigs() error {
         return fmt.Errorf("failed to save Linode icon: %v", err)
     }
 
-    // Read all files in the .kube directory
     files, err := os.ReadDir(kubeconfigDir)
     if err != nil {
         return fmt.Errorf("failed to read kubeconfig directory: %v", err)
     }
 
     var filesToDelete []string
-
     for _, file := range files {
-        // Only consider files with the .yaml extension
-        if filepath.Ext(file.Name()) == ".yaml" {
-            filePath := filepath.Join(kubeconfigDir, file.Name())
-            filePath = filepath.Clean(filePath)
-
-            // Ensure the file path is within the .kube directory
-            if !strings.HasPrefix(filePath, kubeconfigDir) {
-                utils.WarnLogger.Printf("%s Ignoring file outside .kube directory: %s", utils.Iso8601Time(), filePath)
-                continue
-            }
-
-            utils.ActionLogger.Printf("%s Merging kubeconfig from %s", utils.Iso8601Time(), filePath)
-
-            newConfig, err := loadKubeconfig(filePath)
-            if err != nil {
-                return fmt.Errorf("failed to load kubeconfig from %s: %v", filePath, err)
-            }
-
-            // Get the context name from the file name
-            contextName := strings.TrimSuffix(file.Name(), "-kubeconfig.yaml")
-
-            err = mergeKubeconfigs(mainConfig, newConfig, contextName, imagePath)
-            if err != nil {
-                return fmt.Errorf("failed to merge kubeconfig from %s: %v", filePath, err)
-            }
-
-            // Add the file to the list of files to delete
+        if filepath.Ext(file.Name()) != ".yaml" {
+            continue
+        }
+        filePath, err := processYAMLFile(mainConfig, kubeconfigDir, file.Name(), imagePath)
+        if err != nil {
+            return err
+        }
+        if filePath != "" {
             filesToDelete = append(filesToDelete, filePath)
         }
     }
 
-    // Save the merged kubeconfig
-    err = saveKubeconfig(mainConfig, mainKubeconfigPath)
-    if err != nil {
+    if err := saveKubeconfig(mainConfig, mainKubeconfigPath); err != nil {
         return fmt.Errorf("failed to save merged kubeconfig: %v", err)
     }
 
     utils.InfoLogger.Printf("%s Successfully merged kubeconfigs into %s", utils.Iso8601Time(), mainKubeconfigPath)
-
-    // Delete the other kubeconfig files safely
-    for _, filePath := range filesToDelete {
-        // Ensure the file path is still within the .kube directory
-        if !strings.HasPrefix(filePath, kubeconfigDir) {
-            utils.WarnLogger.Printf("%s Skipping deletion of file outside .kube directory: %s", utils.Iso8601Time(), filePath)
-            continue
-        }
-
-        err := os.Remove(filePath)
-        if err != nil {
-            utils.WarnLogger.Printf("%s Warning: failed to delete file %s: %v", utils.Iso8601Time(), filePath, err)
-        } else {
-            utils.InfoLogger.Printf("%s Deleted file %s", utils.Iso8601Time(), filePath)
-        }
-    }
+    cleanupMergedFiles(filesToDelete, kubeconfigDir)
 
     return nil
 }
@@ -194,16 +188,10 @@ func MergeConfigs() error {
 // The function returns an api.Config object and an error. If the error
 // is not nil, the returned config object is nil.
 func loadKubeconfig(path string) (*api.Config, error) {
-    // Get the user's home directory and ensure it's an absolute path
-    homeDir, err := os.UserHomeDir()
+    _, kubeconfigDir, err := getKubeDir()
     if err != nil {
-        return nil, fmt.Errorf("failed to get user home directory: %v", err)
+        return nil, err
     }
-    homeDir = filepath.Clean(homeDir)
-
-    // Ensure the kubeconfig path is inside the expected ~/.kube directory
-    kubeconfigDir := filepath.Join(homeDir, ".kube")
-    kubeconfigDir = filepath.Clean(kubeconfigDir)
 
     if !strings.HasPrefix(filepath.Clean(path), kubeconfigDir) {
         return nil, fmt.Errorf("path traversal attempt detected: %s", path)
@@ -214,7 +202,6 @@ func loadKubeconfig(path string) (*api.Config, error) {
         return nil, fmt.Errorf("failed to read kubeconfig file at %s: %v", path, err)
     }
 
-    // Parse the contents of the file into an api.Config object
     config, err := clientcmd.Load(kubeconfigBytes)
     if err != nil {
         return nil, fmt.Errorf("failed to load kubeconfig file at %s: %v", path, err)
@@ -243,65 +230,75 @@ func isSameCluster(cluster1, cluster2 *api.Cluster) bool {
     return true
 }
 
+// mergeMaps copies non-existing entries from source maps to destination maps
+func mergeClusters(dest, src map[string]*api.Cluster) {
+    for key, cluster := range src {
+        if _, exists := dest[key]; !exists {
+            dest[key] = cluster
+        }
+    }
+}
+
+func mergeAuthInfos(dest, src map[string]*api.AuthInfo) {
+    for key, authInfo := range src {
+        if _, exists := dest[key]; !exists {
+            dest[key] = authInfo
+        }
+    }
+}
+
+// handleExistingContext checks if an existing context should be skipped or overwritten
+// Returns: shouldSkip, shouldOverwrite
+func handleExistingContext(dest, src *api.Config, contextName string, context *api.Context) (bool, bool) {
+    existingContext, exists := dest.Contexts[contextName]
+    if !exists {
+        return false, false
+    }
+
+    srcCluster := src.Clusters[context.Cluster]
+    destCluster := dest.Clusters[existingContext.Cluster]
+
+    if isSameCluster(srcCluster, destCluster) {
+        utils.ActionLogger.Printf("%s Context %s already exists for the same cluster, skipping...", utils.Iso8601Time(), color.New(color.Bold).Sprint(contextName))
+        return true, false
+    }
+
+    utils.ActionLogger.Printf("%s Context %s exists but refers to a different cluster, overwriting...", utils.Iso8601Time(), color.New(color.Bold).Sprint(contextName))
+    dest.Clusters[context.Cluster] = src.Clusters[context.Cluster]
+    if authInfo, exists := src.AuthInfos[context.AuthInfo]; exists {
+        dest.AuthInfos[context.AuthInfo] = authInfo
+    }
+    return false, true
+}
+
+// createContextWithExtension creates a new context with the Aptakube extension
+func createContextWithExtension(context *api.Context, imagePath string) *api.Context {
+    newContext := *context
+    newContext.Extensions = map[string]runtime.Object{
+        "aptakube": &AptakubeExtension{IconURL: imagePath},
+    }
+    return &newContext
+}
+
 // mergeKubeconfigs merges the source kubeconfig into the destination kubeconfig and renames contexts
 func mergeKubeconfigs(dest, src *api.Config, contextName string, imagePath string) error {
-    for key, cluster := range src.Clusters {
-        if _, exists := dest.Clusters[key]; !exists {
-            dest.Clusters[key] = cluster
-        }
-    }
-
-    for key, authInfo := range src.AuthInfos {
-        if _, exists := dest.AuthInfos[key]; !exists {
-            dest.AuthInfos[key] = authInfo
-        }
-    }
+    mergeClusters(dest.Clusters, src.Clusters)
+    mergeAuthInfos(dest.AuthInfos, src.AuthInfos)
 
     for key, context := range src.Contexts {
-        originalClusterName := context.Cluster
-        shouldOverwrite := false
-
-        if existingContext, exists := dest.Contexts[contextName]; exists {
-            // Check if the existing context refers to the same Kubernetes instance
-            srcCluster := src.Clusters[context.Cluster]
-            destCluster := dest.Clusters[existingContext.Cluster]
-
-            if isSameCluster(srcCluster, destCluster) {
-                utils.ActionLogger.Printf("%s Context %s already exists for the same cluster, skipping...", utils.Iso8601Time(), color.New(color.Bold).Sprint(contextName))
-                continue
-            }
-
-            // Different cluster with same name - overwrite the existing context
-            utils.ActionLogger.Printf("%s Context %s exists but refers to a different cluster, overwriting...", utils.Iso8601Time(), color.New(color.Bold).Sprint(contextName))
-
-            // Update the cluster and auth info
-            dest.Clusters[originalClusterName] = src.Clusters[context.Cluster]
-            if authInfo, exists := src.AuthInfos[context.AuthInfo]; exists {
-                dest.AuthInfos[context.AuthInfo] = authInfo
-            }
-            shouldOverwrite = true
+        shouldSkip, shouldOverwrite := handleExistingContext(dest, src, contextName, context)
+        if shouldSkip {
+            continue
         }
 
-        var uniqueContextName string
-        if shouldOverwrite {
-            // Use the same context name when overwriting
-            uniqueContextName = contextName
-        } else {
-            // Make the context name unique for new contexts
+        uniqueContextName := contextName
+        if !shouldOverwrite {
             uniqueContextName = makeContextNameUnique(contextName, dest.Contexts)
         }
 
-        newContext := *context
-        newContext.Cluster = originalClusterName
-
-        // Add the extensions stanza for Linode contexts
-        newContext.Extensions = map[string]runtime.Object{
-            "aptakube": &AptakubeExtension{
-                IconURL: imagePath,
-            },
-        }
-
-        dest.Contexts[uniqueContextName] = &newContext
+        newContext := createContextWithExtension(context, imagePath)
+        newContext.Cluster = context.Cluster
+        dest.Contexts[uniqueContextName] = newContext
 
         if src.CurrentContext == key {
             dest.CurrentContext = uniqueContextName

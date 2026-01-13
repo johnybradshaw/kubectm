@@ -122,6 +122,62 @@ func LoadSelectedCredentialProviders() ([]string, error) {
     return providers, nil
 }
 
+// resetStoredCredentials removes the stored credentials file to force re-prompting
+func resetStoredCredentials() {
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        errorLogger.Fatalf("%s Failed to get user home directory: %v", iso8601Time(), err)
+    }
+    configFile := filepath.Join(homeDir, storedCredsPath)
+    err = os.Remove(configFile)
+    if err != nil && !os.IsNotExist(err) {
+        errorLogger.Fatalf("%s Failed to reset stored credentials: %v", iso8601Time(), err)
+    }
+    warnLogger.Printf("%s Stored credentials have been reset. You'll be prompted to select credentials.", iso8601Time())
+}
+
+// promptAndSelectProviders prompts the user to select credential providers and saves their selection
+func promptAndSelectProviders() []string {
+    creds, err := credentials.RetrieveAll()
+    if err != nil {
+        errorLogger.Fatalf("%s Failed to retrieve credentials: %v", iso8601Time(), err)
+    }
+
+    selectedCreds := ui.SelectCredentials(creds)
+
+    providers := make([]string, 0, len(selectedCreds))
+    for _, cred := range selectedCreds {
+        providers = append(providers, cred.Provider)
+    }
+
+    if err := SaveSelectedCredentialProviders(providers); err != nil {
+        errorLogger.Printf("%s Failed to save selected providers: %v", iso8601Time(), err)
+    }
+
+    return providers
+}
+
+// getSelectedProviders loads saved providers or prompts the user to select them
+func getSelectedProviders() []string {
+    selectedProviders, err := LoadSelectedCredentialProviders()
+    if err != nil || len(selectedProviders) == 0 {
+        warnLogger.Printf("%s No previous credential selections found or an error occurred, prompting user to select credentials.", iso8601Time())
+        return promptAndSelectProviders()
+    }
+    infoLogger.Printf("%s Using previously selected credential providers.", iso8601Time())
+    return selectedProviders
+}
+
+// downloadAllConfigs downloads kubeconfig files for all provided credentials
+func downloadAllConfigs(creds []credentials.Credential) {
+    for _, cred := range creds {
+        infoLogger.Printf("%s Downloading kubeconfig from %s", iso8601Time(), cred.Provider)
+        if err := kubeconfig.DownloadConfigs([]credentials.Credential{cred}); err != nil {
+            errorLogger.Fatalf("%s Failed to download kubeconfig files from %s: %v", iso8601Time(), cred.Provider, err)
+        }
+    }
+}
+
 func main() {
     var showHelp bool
     var showVersion bool
@@ -147,63 +203,19 @@ func main() {
     infoLogger.Printf("%s Starting kubectm...\n", iso8601Time())
 
     if resetCreds {
-        homeDir, err := os.UserHomeDir()
-        if err != nil {
-            errorLogger.Fatalf("%s Failed to get user home directory: %v", iso8601Time(), err)
-        }
-        configFile := filepath.Join(homeDir, storedCredsPath)
-        err = os.Remove(configFile)
-        if err != nil && !os.IsNotExist(err) {
-            errorLogger.Fatalf("%s Failed to reset stored credentials: %v", iso8601Time(), err)
-        }
-        warnLogger.Printf("%s Stored credentials have been reset. You'll be prompted to select credentials.", iso8601Time())
+        resetStoredCredentials()
     }
 
-    // Try to load previously selected credential providers
-    selectedProviders, err := LoadSelectedCredentialProviders()
-    if err != nil || len(selectedProviders) == 0 {
-        warnLogger.Printf("%s No previous credential selections found or an error occurred, prompting user to select credentials.", iso8601Time())
-        
-        creds, err := credentials.RetrieveAll()
-        if err != nil {
-            errorLogger.Fatalf("%s Failed to retrieve credentials: %v", iso8601Time(), err)
-        }
+    selectedProviders := getSelectedProviders()
 
-        // Prompt user to select credentials
-        selectedCreds := ui.SelectCredentials(creds)
-
-        // Extract provider names from selected credentials
-        selectedProviders = []string{}
-        for _, cred := range selectedCreds {
-            selectedProviders = append(selectedProviders, cred.Provider)
-        }
-
-        // Save the selected providers for future use
-        err = SaveSelectedCredentialProviders(selectedProviders)
-        if err != nil {
-            errorLogger.Printf("%s Failed to save selected providers: %v", iso8601Time(), err)
-        }
-    } else {
-        infoLogger.Printf("%s Using previously selected credential providers.", iso8601Time())
-    }
-
-    // Retrieve credentials based on selected providers
     creds, err := credentials.RetrieveSelected(selectedProviders)
     if err != nil {
         errorLogger.Fatalf("%s Failed to retrieve selected credentials: %v", iso8601Time(), err)
     }
 
-    // Proceed with the rest of the logic using the retrieved credentials
-    for _, cred := range creds {
-        infoLogger.Printf("%s Downloading kubeconfig from %s", iso8601Time(), cred.Provider)
-        err := kubeconfig.DownloadConfigs([]credentials.Credential{cred})
-        if err != nil {
-            errorLogger.Fatalf("%s Failed to download kubeconfig files from %s: %v", iso8601Time(), cred.Provider, err)
-        }
-    }
+    downloadAllConfigs(creds)
 
-    err = kubeconfig.MergeConfigs()
-    if err != nil {
+    if err := kubeconfig.MergeConfigs(); err != nil {
         errorLogger.Fatalf("%s Failed to merge kubeconfig files: %v", iso8601Time(), err)
     }
 

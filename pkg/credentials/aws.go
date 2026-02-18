@@ -29,10 +29,7 @@ func retrieveAWSCredentials() (*Credential, error) {
 			details["Region"] = region
 		}
 
-		utils.InfoLogger.Printf("%s AWS credentials found via environment variables: %v", utils.Iso8601Time(), map[string]string{
-			"AccessKey": utils.ObfuscateCredential(accessKeyID),
-			"SecretKey": utils.ObfuscateCredential(secretAccessKey),
-		})
+		utils.InfoLogger.Printf("%s AWS credentials found via environment variables", utils.Iso8601Time())
 
 		return &Credential{
 			Provider: "AWS",
@@ -41,13 +38,23 @@ func retrieveAWSCredentials() (*Credential, error) {
 	}
 
 	// Fall back to ~/.aws/credentials file
-	credentialsFilePath := filepath.Join(os.Getenv("HOME"), ".aws", "credentials")
-	utils.InfoLogger.Printf("%s Looking for AWS credentials file: %s", utils.Iso8601Time(), credentialsFilePath)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("error getting home directory: %v", err)
+	}
+	credentialsFilePath := filepath.Join(homeDir, ".aws", "credentials")
+
+	// Validate that the resolved path is within the home directory to prevent path traversal
+	if !strings.HasPrefix(credentialsFilePath, homeDir+string(filepath.Separator)) {
+		return nil, fmt.Errorf("invalid credentials file path")
+	}
+
+	utils.InfoLogger.Printf("%s Looking for AWS credentials file", utils.Iso8601Time())
 
 	fileContent, err := os.ReadFile(credentialsFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			utils.WarnLogger.Printf("%s AWS credentials file not found: %s", utils.Iso8601Time(), credentialsFilePath)
+			utils.WarnLogger.Printf("%s AWS credentials file not found", utils.Iso8601Time())
 			return nil, nil
 		}
 		utils.ErrorLogger.Printf("%s Error reading AWS credentials file: %v", utils.Iso8601Time(), err)
@@ -105,7 +112,7 @@ func parseAWSCredentialsFile(content []byte, profile string) *Credential {
 			key := strings.TrimSpace(parts[0])
 			value := strings.TrimSpace(parts[1])
 
-			switch key {
+			switch strings.ToLower(key) {
 			case "aws_access_key_id":
 				accessKeyID = value
 			case "aws_secret_access_key":
@@ -133,10 +140,7 @@ func parseAWSCredentialsFile(content []byte, profile string) *Credential {
 		details["Region"] = region
 	}
 
-	utils.InfoLogger.Printf("%s AWS credentials found via credentials file: %v", utils.Iso8601Time(), map[string]string{
-		"AccessKey": utils.ObfuscateCredential(accessKeyID),
-		"SecretKey": utils.ObfuscateCredential(secretAccessKey),
-	})
+	utils.InfoLogger.Printf("%s AWS credentials found via credentials file", utils.Iso8601Time())
 
 	return &Credential{
 		Provider: "AWS",

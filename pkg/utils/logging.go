@@ -2,7 +2,7 @@ package utils
 
 import (
     "log"
-    "io/ioutil"
+    "io"
     "os"
     "time"
     "strings"
@@ -10,8 +10,8 @@ import (
 )
 
 func init() {
-    // Disable the default logger by redirecting it to ioutil.Discard
-    log.SetOutput(ioutil.Discard)
+    // Disable the default logger by redirecting it to io.Discard
+    log.SetOutput(io.Discard)
 }
 
 // Loggers for different log levels

@@ -17,7 +17,7 @@ func RetrieveAll() ([]Credential, error) {
     var credentials []Credential
 
     // Discover AWS credentials
-    awsCreds, err := retrieveAWSCredentials()  // Stub function
+    awsCreds, err := retrieveAWSCredentials()
     if err != nil {
         log.Printf("Error retrieving AWS credentials: %v", err)
     } else if awsCreds != nil {
@@ -79,34 +79,29 @@ func RetrieveSelected(selectedProviders []string) ([]Credential, error) {
     var creds []Credential
 
     for _, provider := range selectedProviders {
+        var cred *Credential
+        var err error
+
         switch provider {
         case "AWS":
-            cred, err := retrieveAWSCredentials()
-            if err != nil {
-                return nil, fmt.Errorf("error retrieving AWS credentials: %v", err)
-            }
-            creds = append(creds, *cred)
+            cred, err = retrieveAWSCredentials()
         case "Azure":
-            cred, err := retrieveAzureCredentials()
-            if err != nil {
-                return nil, fmt.Errorf("error retrieving Azure credentials: %v", err)
-            }
-            creds = append(creds, *cred)
+            cred, err = retrieveAzureCredentials()
         case "GCP":
-            cred, err := retrieveGCPCredentials()
-            if err != nil {
-                return nil, fmt.Errorf("error retrieving GCP credentials: %v", err)
-            }
-            creds = append(creds, *cred)
+            cred, err = retrieveGCPCredentials()
         case "Linode":
-            cred, err := retrieveLinodeCredentials()
-            if err != nil {
-                return nil, fmt.Errorf("error retrieving Linode credentials: %v", err)
-            }
-            creds = append(creds, *cred)
+            cred, err = retrieveLinodeCredentials()
         default:
             return nil, fmt.Errorf("unsupported provider: %s", provider)
         }
+
+        if err != nil {
+            return nil, fmt.Errorf("error retrieving %s credentials: %v", provider, err)
+        }
+        if cred == nil {
+            return nil, fmt.Errorf("%s credentials not found", provider)
+        }
+        creds = append(creds, *cred)
     }
 
     return creds, nil

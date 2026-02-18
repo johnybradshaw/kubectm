@@ -4,7 +4,7 @@ import (
     "encoding/base64"
     "encoding/json"
     "fmt"
-    "io/ioutil"
+    "io"
     "net/http"
     "os"
     "path/filepath"
@@ -107,7 +107,7 @@ func getLinodeClusters(token string) ([]LinodeCluster, error) {
     // Check the status code of the response.
     if resp.StatusCode != http.StatusOK {
         // If the status code is not 200, read the body and return an error.
-        body, _ := ioutil.ReadAll(resp.Body)
+        body, _ := io.ReadAll(resp.Body)
         return nil, fmt.Errorf("failed to list clusters, status: %d, body: %s", resp.StatusCode, string(body))
     }
 
@@ -153,7 +153,7 @@ func getLinodeKubeconfig(token string, clusterID int) (string, error) {
     // Check the status code of the response.
     if resp.StatusCode != http.StatusOK {
         // If the status code is not 200, read the body and return an error.
-        body, _ := ioutil.ReadAll(resp.Body)
+        body, _ := io.ReadAll(resp.Body)
         return "", fmt.Errorf("failed to retrieve kubeconfig, status: %d, body: %s", resp.StatusCode, string(body))
     }
 

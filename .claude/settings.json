@@ -13,24 +13,24 @@
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
-        "command": "if echo \"$CLAUDE_FILE_PATH\" | grep -qE '\\.go$'; then gofmt -w \"$CLAUDE_FILE_PATH\"; fi",
+        "command": "case \"$CLAUDE_FILE_PATH\" in *.go) gofmt -w \"$CLAUDE_FILE_PATH\";; esac",
         "description": "Auto-format Go files on edit"
       },
       {
         "matcher": "Edit|Write",
-        "command": "if echo \"$CLAUDE_FILE_PATH\" | grep -qE '\\.go$'; then cd \"$(git rev-parse --show-toplevel)\" && go vet ./... 2>&1 | head -20; fi",
+        "command": "case \"$CLAUDE_FILE_PATH\" in *.go) cd \"$(git rev-parse --show-toplevel)\" && go vet ./... 2>&1 | head -20;; esac",
         "description": "Run go vet after Go file edits"
       }
     ],
     "PreToolUse": [
       {
         "matcher": "Edit|Write",
-        "command": "if echo \"$CLAUDE_FILE_PATH\" | grep -qE '\\.(age|key)$'; then echo 'BLOCK: Encrypted/key files should not be edited directly' && exit 1; fi",
+        "command": "case \"$CLAUDE_FILE_PATH\" in *.age|*.key) echo 'BLOCK: Encrypted/key files should not be edited directly' && exit 1;; esac",
         "description": "Block edits to encrypted and key files"
       },
       {
         "matcher": "Edit|Write",
-        "command": "if echo \"$CLAUDE_FILE_PATH\" | grep -qE 'go\\.sum$'; then echo 'BLOCK: go.sum should not be edited directly — use go mod tidy' && exit 1; fi",
+        "command": "case \"$CLAUDE_FILE_PATH\" in *go.sum) echo 'BLOCK: go.sum should not be edited directly — use go mod tidy' && exit 1;; esac",
         "description": "Block direct edits to go.sum"
       }
     ]

@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go test:*)",
+      "Bash(go build:*)",
+      "Bash(go vet:*)",
+      "Bash(gofmt:*)"
+    ],
+    "deny": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "command": "if echo \"$CLAUDE_FILE_PATH\" | grep -qE '\\.go$'; then gofmt -w \"$CLAUDE_FILE_PATH\"; fi",
+        "description": "Auto-format Go files on edit"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "command": "if echo \"$CLAUDE_FILE_PATH\" | grep -qE '\\.(age|key)$'; then echo 'BLOCK: Encrypted/key files should not be edited directly' && exit 1; fi",
+        "description": "Block edits to encrypted and key files"
+      }
+    ]
+  }
+}

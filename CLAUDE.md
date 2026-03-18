@@ -8,6 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build the binary
 go build -o kubectm ./cmd
 
+# Vet the code
+go vet ./...
+
 # Run tests with coverage
 go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
@@ -32,17 +35,21 @@ kubectm is a CLI tool that downloads and merges Kubernetes configurations from c
 
 ### Package Structure
 
-- **cmd/main.go** - Entry point. Handles CLI flags, loads/saves selected providers to `~/.kubectm/selected_providers.json`, orchestrates credential retrieval and kubeconfig operations.
+- **cmd/main.go** - Entry point. Handles CLI flags, loads/saves selected providers to `~/.kubectm/selected_credentials.json`, orchestrates credential retrieval and kubeconfig operations.
 
 - **pkg/credentials/** - Provider credential discovery
   - `retrieve.go` - Central dispatcher with `RetrieveAll()` and `RetrieveSelected()` functions
   - `linode.go` - Reads from `LINODE_ACCESS_TOKEN` env var or `~/.config/linode-cli` config file
-  - `aws.go`, `azure.go`, `gcp.go` - Stub implementations (not yet functional)
+  - `aws.go` - Reads from `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` env vars or `~/.aws/credentials` file
+  - `aws_test.go` - Tests for AWS credential retrieval
+  - `azure.go`, `gcp.go` - Stub implementations (not yet functional)
 
 - **pkg/kubeconfig/** - Kubeconfig operations
   - `download.go` - Dispatcher that routes to provider-specific downloaders
   - `linode.go` - Calls Linode API (`/lke/clusters` and `/lke/clusters/{id}/kubeconfig`) to fetch kubeconfigs
   - `merge.go` - Merges `.yaml` files from `~/.kube/` into the main config, handles context naming conflicts, adds Aptakube extension for Linode icon
+  - `rename.go` - Stub for renaming clusters and contexts in kubeconfig files
+  - `linode_test.go` - Tests for Linode kubeconfig download
   - `lke.png` - Embedded Linode icon (via `//go:embed`)
 
 - **pkg/ui/prompt.go** - Interactive multi-select for credential providers using `survey/v2`
@@ -51,7 +58,7 @@ kubectm is a CLI tool that downloads and merges Kubernetes configurations from c
 
 ### Data Flow
 
-1. On first run: discover all available credentials → prompt user to select → save selection
+1. On first run: discover all available credentials → prompt user to select → save selection to `~/.kubectm/selected_credentials.json`
 2. On subsequent runs: load saved provider selection → retrieve credentials for those providers
 3. For each provider: download kubeconfigs to `~/.kube/{label}-kubeconfig.yaml`
 4. Merge all `.yaml` files into `~/.kube/config`, then delete the temporary files

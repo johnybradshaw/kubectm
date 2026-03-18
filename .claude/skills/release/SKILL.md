@@ -42,6 +42,7 @@ Parse arguments in the format: `/release <version>` where version is a semver st
    ```
 
 6. **Confirm**: Display a link to the GitHub Actions run that will build and publish the release.
+   The Actions pipeline produces GPG signatures and build attestations automatically — wait for CI to complete rather than expecting local artefacts. The workflow generates release notes directly from the tag; no separate changelog file needs to be written locally before pushing.
 
 ## Examples
 

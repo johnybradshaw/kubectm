@@ -13,6 +13,7 @@ Downloads kubeconfigs from cloud provider APIs and merges them into `~/.kube/con
 | `merge.go` | Merges `.yaml` files from `~/.kube/` into main config |
 | `rename.go` | Stub for renaming clusters/contexts in kubeconfigs |
 | `lke.png` | Embedded Linode icon for Aptakube extension (`//go:embed`) |
+| `linode_test.go` | Tests for Linode kubeconfig download |
 
 ## Dependencies
 

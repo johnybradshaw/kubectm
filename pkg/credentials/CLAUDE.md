@@ -13,6 +13,7 @@ Discovers and retrieves cloud provider credentials from environment variables an
 | `aws.go` | Reads `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` env vars or `~/.aws/credentials` |
 | `azure.go` | Stub — not yet implemented |
 | `gcp.go` | Stub — not yet implemented |
+| `aws_test.go` | Tests for AWS credential retrieval |
 
 ## Dependencies
 

@@ -1,6 +1,7 @@
 package kubeconfig
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"kubectm/pkg/credentials"
@@ -105,8 +107,13 @@ func loadRegionOverride() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	homeDir = filepath.Clean(homeDir)
 
-	configPath := filepath.Join(homeDir, ".kubectm", "config.json")
+	configPath := filepath.Clean(filepath.Join(homeDir, ".kubectm", "config.json"))
+	if !strings.HasPrefix(configPath, homeDir+string(filepath.Separator)) {
+		return nil, fmt.Errorf("invalid config path outside user home")
+	}
+
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -264,26 +271,22 @@ func processEKSCluster(ctx context.Context, client *eks.Client, clusterName, reg
 	return saveKubeconfigToFile(contextName, kubeconfigContent)
 }
 
-// generateEKSKubeconfig generates a kubeconfig YAML string for an EKS cluster
-// that uses the `aws eks get-token` exec plugin for authentication.
-func generateEKSKubeconfig(clusterName, region, endpoint, caData string) string {
-	contextName := fmt.Sprintf("%s@%s", clusterName, region)
-
-	return fmt.Sprintf(`apiVersion: v1
+// eksKubeconfigTemplate is the template for generating EKS kubeconfig files.
+var eksKubeconfigTemplate = template.Must(template.New("kubeconfig").Parse(`apiVersion: v1
 kind: Config
 clusters:
 - cluster:
-    server: %s
-    certificate-authority-data: %s
-  name: %s
+    server: {{.Endpoint}}
+    certificate-authority-data: {{.CAData}}
+  name: {{.ContextName}}
 contexts:
 - context:
-    cluster: %s
-    user: %s
-  name: %s
-current-context: %s
+    cluster: {{.ContextName}}
+    user: {{.ContextName}}
+  name: {{.ContextName}}
+current-context: {{.ContextName}}
 users:
-- name: %s
+- name: {{.ContextName}}
   user:
     exec:
       apiVersion: client.authentication.k8s.io/v1beta1
@@ -292,11 +295,33 @@ users:
       - eks
       - get-token
       - --cluster-name
-      - %s
+      - {{.ClusterName}}
       - --region
-      - %s
-`, endpoint, caData, contextName,
-		contextName, contextName, contextName, contextName,
-		contextName,
-		clusterName, region)
+      - {{.Region}}
+`))
+
+// generateEKSKubeconfig generates a kubeconfig YAML string for an EKS cluster
+// that uses the `aws eks get-token` exec plugin for authentication.
+func generateEKSKubeconfig(clusterName, region, endpoint, caData string) string {
+	data := struct {
+		Endpoint    string
+		CAData      string
+		ContextName string
+		ClusterName string
+		Region      string
+	}{
+		Endpoint:    endpoint,
+		CAData:      caData,
+		ContextName: fmt.Sprintf("%s@%s", clusterName, region),
+		ClusterName: clusterName,
+		Region:      region,
+	}
+
+	var buf bytes.Buffer
+	if err := eksKubeconfigTemplate.Execute(&buf, data); err != nil {
+		utils.ErrorLogger.Printf("%s Error executing EKS kubeconfig template: %v", utils.Iso8601Time(), err)
+		return ""
+	}
+
+	return buf.String()
 }

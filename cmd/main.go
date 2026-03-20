@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"github.com/fatih/color"
 	"kubectm/pkg/credentials"
 	"kubectm/pkg/kubeconfig"
@@ -10,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -64,16 +66,23 @@ func SaveSelectedCredentialProviders(providers []string) error {
 	if err != nil {
 		return err
 	}
+	homeDir = filepath.Clean(homeDir)
 
 	// Create the .kubectm directory if it doesn't exist
 	configDir := filepath.Join(homeDir, ".kubectm")
-	err = os.MkdirAll(configDir, os.ModePerm)
+	if !strings.HasPrefix(configDir, homeDir) {
+		return fmt.Errorf("invalid config directory path: %s", configDir)
+	}
+	err = os.MkdirAll(configDir, 0700)
 	if err != nil {
 		return err
 	}
 
 	// Create the selected_providers.json file if it doesn't exist, or overwrite it if it does
 	configFile := filepath.Join(configDir, "selected_providers.json")
+	if !strings.HasPrefix(configFile, configDir) {
+		return fmt.Errorf("invalid config file path: %s", configFile)
+	}
 	file, err := os.Create(configFile)
 	if err != nil {
 		return err
@@ -96,9 +105,13 @@ func LoadSelectedCredentialProviders() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	homeDir = filepath.Clean(homeDir)
 
 	// Construct the path to the selected_providers.json file
 	configFile := filepath.Join(homeDir, ".kubectm", "selected_providers.json")
+	if !strings.HasPrefix(configFile, homeDir) {
+		return nil, fmt.Errorf("invalid config file path: %s", configFile)
+	}
 
 	// Open the file for reading
 	file, err := os.Open(configFile)
@@ -128,7 +141,11 @@ func resetStoredCredentials() {
 	if err != nil {
 		errorLogger.Fatalf("%s Failed to get user home directory: %v", iso8601Time(), err)
 	}
+	homeDir = filepath.Clean(homeDir)
 	configFile := filepath.Join(homeDir, storedCredsPath)
+	if !strings.HasPrefix(configFile, homeDir) {
+		errorLogger.Fatalf("%s Invalid credentials path: %s", iso8601Time(), configFile)
+	}
 	err = os.Remove(configFile)
 	if err != nil && !os.IsNotExist(err) {
 		errorLogger.Fatalf("%s Failed to reset stored credentials: %v", iso8601Time(), err)

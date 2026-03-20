@@ -33,7 +33,7 @@ func Iso8601Time() string {
 // ObfuscateCredential partially hides a credential string, showing only the first and last 4 characters.
 func ObfuscateCredential(credential string) string {
     if len(credential) <= 8 {
-        return credential // If the credential is too short, return it as is
+        return "****"
     }
     return credential[:4] + strings.Repeat("*", len(credential)-8) + credential[len(credential)-4:]
 }

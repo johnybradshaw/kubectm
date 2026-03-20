@@ -8,6 +8,7 @@ import (
     "net/http"
     "os"
     "path/filepath"
+    "strings"
     "github.com/fatih/color"
     "kubectm/pkg/credentials"
     "kubectm/pkg/utils"  // Import the utils package
@@ -197,7 +198,12 @@ func saveKubeconfigToFile(clusterLabel string, kubeconfig string) error {
 
     // Create the file name by appending the cluster label to the
     // "kubeconfig.yaml" string
-    kubeconfigFile := filepath.Join(kubeconfigDir, fmt.Sprintf("%s-kubeconfig.yaml", clusterLabel))
+    kubeconfigFile := filepath.Clean(filepath.Join(kubeconfigDir, fmt.Sprintf("%s-kubeconfig.yaml", clusterLabel)))
+
+    // Validate path stays within ~/.kube/ to prevent path traversal
+    if !strings.HasPrefix(kubeconfigFile, kubeconfigDir+string(filepath.Separator)) {
+        return fmt.Errorf("invalid kubeconfig file path: path traversal detected in cluster label %q", clusterLabel)
+    }
 
     // Write the kubeconfig string to the file
     err = os.WriteFile(kubeconfigFile, []byte(kubeconfig), 0600)

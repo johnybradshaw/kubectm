@@ -38,18 +38,17 @@ kubectm is a CLI tool that downloads and merges Kubernetes configurations from c
 - **cmd/main.go** - Entry point. Handles CLI flags, loads/saves selected providers to `~/.kubectm/selected_credentials.json`, orchestrates credential retrieval and kubeconfig operations.
 
 - **pkg/credentials/** - Provider credential discovery
-  - `retrieve.go` - Central dispatcher with `RetrieveAll()` and `RetrieveSelected()` functions
+  - `retrieve.go` - Central dispatcher with `RetrieveAll()` and `RetrieveSelected()` functions; includes `logCredentialDiscovery()` helper for obfuscated logging
   - `linode.go` - Reads from `LINODE_ACCESS_TOKEN` env var or `~/.config/linode-cli` config file
   - `aws.go` - Reads from `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` env vars or `~/.aws/credentials` file
-  - `aws_test.go` - Tests for AWS credential retrieval
   - `azure.go`, `gcp.go` - Stub implementations (not yet functional)
 
 - **pkg/kubeconfig/** - Kubeconfig operations
-  - `download.go` - Dispatcher that routes to provider-specific downloaders
+  - `download.go` - Dispatcher that routes to provider-specific downloaders (Linode, AWS)
   - `linode.go` - Calls Linode API (`/lke/clusters` and `/lke/clusters/{id}/kubeconfig`) to fetch kubeconfigs
+  - `aws.go` - Downloads EKS kubeconfigs: auto-discovers regions via EC2 DescribeRegions, lists/describes EKS clusters in parallel, generates exec-based kubeconfigs using `aws eks get-token`
   - `merge.go` - Merges `.yaml` files from `~/.kube/` into the main config, handles context naming conflicts, adds Aptakube extension for Linode icon
   - `rename.go` - Stub for renaming clusters and contexts in kubeconfig files
-  - `linode_test.go` - Tests for Linode kubeconfig download
   - `lke.png` - Embedded Linode icon (via `//go:embed`)
 
 - **pkg/ui/prompt.go** - Interactive multi-select for credential providers using `survey/v2`
@@ -71,16 +70,28 @@ The Linode provider uses API v4 (`https://api.linode.com/v4`):
 
 Authentication via Bearer token from either `LINODE_ACCESS_TOKEN` env var or `linode-cli` config.
 
+### AWS EKS Integration
+
+The AWS provider uses AWS SDK v2:
+- `EC2 DescribeRegions` - Auto-discover enabled regions (with optional `~/.kubectm/config.json` override)
+- `EKS ListClusters` - List cluster names per region (with pagination)
+- `EKS DescribeCluster` - Get cluster endpoint + CA certificate
+
+Regions are scanned in parallel (concurrency=5, 30s timeout). Generated kubeconfigs use the `aws eks get-token` exec plugin for authentication. Context naming: `{cluster-name}@{region}`.
+
+Authentication via static credentials from the discovered `Credential.Details` (AccessKey, SecretKey, optional SessionToken).
+
 ## Key Dependencies
 
 - `k8s.io/client-go` - Kubernetes client library for kubeconfig handling
 - `k8s.io/apimachinery` - Kubernetes API types
+- `github.com/aws/aws-sdk-go-v2` - AWS SDK for EC2/EKS API calls
 - `github.com/AlecAivazis/survey/v2` - Interactive prompts
 - `github.com/fatih/color` - Colored terminal output
 
 ## Key Patterns
 
-- Path traversal protection: All file operations in `merge.go` validate paths are within `~/.kube/`
+- Path traversal protection: All file operations in `merge.go` and `linode.go` validate paths are within `~/.kube/`
 - Credential obfuscation: `utils.ObfuscateCredential()` masks sensitive values in logs
 - Context conflict resolution: When merging, same-cluster contexts are skipped; different-cluster same-name contexts are overwritten
 - Version injection: Build with `-ldflags "-X main.Version=..."` for release versioning

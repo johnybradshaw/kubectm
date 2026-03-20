@@ -10,10 +10,12 @@ Downloads kubeconfigs from cloud provider APIs and merges them into `~/.kube/con
 |------|-------------|
 | `download.go` | Dispatcher routing to provider-specific downloaders |
 | `linode.go` | Calls Linode API v4 to fetch LKE cluster kubeconfigs |
+| `aws.go` | Downloads EKS kubeconfigs across all enabled regions |
 | `merge.go` | Merges `.yaml` files from `~/.kube/` into main config |
 | `rename.go` | Stub for renaming clusters/contexts in kubeconfigs |
 | `lke.png` | Embedded Linode icon for Aptakube extension (`//go:embed`) |
 | `linode_test.go` | Tests for Linode kubeconfig download |
+| `aws_test.go` | Tests for AWS EKS kubeconfig download |
 
 ## Dependencies
 
@@ -24,6 +26,7 @@ Downloads kubeconfigs from cloud provider APIs and merges them into `~/.kube/con
 ### External
 - `k8s.io/client-go` — kubeconfig handling
 - `k8s.io/apimachinery` — Kubernetes API types
+- `github.com/aws/aws-sdk-go-v2` — AWS SDK for EC2/EKS API calls
 
 ## Conventions
 

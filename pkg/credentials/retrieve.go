@@ -1,108 +1,109 @@
 package credentials
 
 import (
-    "errors"   // Import the errors package
-    "log"
-    "kubectm/pkg/utils"
-    "fmt"
+	"errors"
+	"fmt"
+	"kubectm/pkg/utils"
 )
 
 type Credential struct {
-    Provider string
-    Details  map[string]string
+	Provider string
+	Details  map[string]string
+}
+
+// logCredentialDiscovery logs the discovery of credentials for a provider,
+// obfuscating all credential values before logging.
+func logCredentialDiscovery(provider string, cred *Credential) {
+	if cred == nil {
+		return
+	}
+	obfuscated := make(map[string]string, len(cred.Details))
+	for k, v := range cred.Details {
+		obfuscated[k] = utils.ObfuscateCredential(v)
+	}
+	utils.InfoLogger.Printf("%s %s credentials found: %v", utils.Iso8601Time(), provider, obfuscated)
 }
 
 // RetrieveAll retrieves all available credentials from the environment.
+// Credential failures are non-fatal: each provider is attempted independently,
+// errors are logged and skipped. Returns an error only if no credentials are found at all.
 func RetrieveAll() ([]Credential, error) {
-    var credentials []Credential
+	var credentials []Credential
 
-    // Discover AWS credentials
-    awsCreds, err := retrieveAWSCredentials()
-    if err != nil {
-        log.Printf("Error retrieving AWS credentials: %v", err)
-    } else if awsCreds != nil {
-        // Obfuscate credentials before logging
-        obfuscatedCreds := map[string]string{
-            "AccessKey": utils.ObfuscateCredential(awsCreds.Details["AccessKey"]),
-            "SecretKey": utils.ObfuscateCredential(awsCreds.Details["SecretKey"]),
-        }
-        log.Printf("AWS credentials found: %v", obfuscatedCreds)
-        credentials = append(credentials, *awsCreds)
-    }
+	// Discover AWS credentials
+	awsCreds, err := retrieveAWSCredentials()
+	if err != nil {
+		utils.ErrorLogger.Printf("%s Error retrieving AWS credentials: %v", utils.Iso8601Time(), err)
+	} else if awsCreds != nil {
+		logCredentialDiscovery("AWS", awsCreds)
+		credentials = append(credentials, *awsCreds)
+	}
 
-    // Discover Azure credentials (assume similar to AWS)
-    azureCreds, err := retrieveAzureCredentials()  // Stub function
-    if err != nil {
-        log.Printf("Error retrieving Azure credentials: %v", err)
-    } else if azureCreds != nil {
-        obfuscatedCreds := map[string]string{
-            "ClientID":     utils.ObfuscateCredential(azureCreds.Details["ClientID"]),
-            "ClientSecret": utils.ObfuscateCredential(azureCreds.Details["ClientSecret"]),
-        }
-        log.Printf("Azure credentials found: %v", obfuscatedCreds)
-        credentials = append(credentials, *azureCreds)
-    }
+	// Discover Azure credentials
+	azureCreds, err := retrieveAzureCredentials()
+	if err != nil {
+		utils.ErrorLogger.Printf("%s Error retrieving Azure credentials: %v", utils.Iso8601Time(), err)
+	} else if azureCreds != nil {
+		logCredentialDiscovery("Azure", azureCreds)
+		credentials = append(credentials, *azureCreds)
+	}
 
-    // Discover GCP credentials (assume similar to AWS)
-    gcpCreds, err := retrieveGCPCredentials()  // Stub function
-    if err != nil {
-        log.Printf("Error retrieving GCP credentials: %v", err)
-    } else if gcpCreds != nil {
-        obfuscatedCreds := map[string]string{
-            "ProjectID": utils.ObfuscateCredential(gcpCreds.Details["ProjectID"]),
-        }
-        log.Printf("GCP credentials found: %v", obfuscatedCreds)
-        credentials = append(credentials, *gcpCreds)
-    }
+	// Discover GCP credentials
+	gcpCreds, err := retrieveGCPCredentials()
+	if err != nil {
+		utils.ErrorLogger.Printf("%s Error retrieving GCP credentials: %v", utils.Iso8601Time(), err)
+	} else if gcpCreds != nil {
+		logCredentialDiscovery("GCP", gcpCreds)
+		credentials = append(credentials, *gcpCreds)
+	}
 
-    // Discover Linode credentials
-    linodeCreds, err := retrieveLinodeCredentials()
-    if err != nil {
-        log.Printf("Error retrieving Linode credentials: %v", err)
-    } else if linodeCreds != nil {
-        obfuscatedCreds := map[string]string{
-            "AccessToken": utils.ObfuscateCredential(linodeCreds.Details["AccessToken"]),
-        }
-        log.Printf("Linode credentials found: %v", obfuscatedCreds)
-        credentials = append(credentials, *linodeCreds)
-    }
+	// Discover Linode credentials
+	linodeCreds, err := retrieveLinodeCredentials()
+	if err != nil {
+		utils.ErrorLogger.Printf("%s Error retrieving Linode credentials: %v", utils.Iso8601Time(), err)
+	} else if linodeCreds != nil {
+		logCredentialDiscovery("Linode", linodeCreds)
+		credentials = append(credentials, *linodeCreds)
+	}
 
-    if len(credentials) == 0 {
-        return nil, errors.New("no credentials found")
-    }
+	if len(credentials) == 0 {
+		return nil, errors.New("no credentials found")
+	}
 
-    return credentials, nil
+	return credentials, nil
 }
 
 // RetrieveSelected retrieves credentials for the specified providers.
+// All selected providers are required: if any provider fails or is not found,
+// an error is returned immediately. Use this when the user has explicitly chosen providers.
 func RetrieveSelected(selectedProviders []string) ([]Credential, error) {
-    var creds []Credential
+	var creds []Credential
 
-    for _, provider := range selectedProviders {
-        var cred *Credential
-        var err error
+	for _, provider := range selectedProviders {
+		var cred *Credential
+		var err error
 
-        switch provider {
-        case "AWS":
-            cred, err = retrieveAWSCredentials()
-        case "Azure":
-            cred, err = retrieveAzureCredentials()
-        case "GCP":
-            cred, err = retrieveGCPCredentials()
-        case "Linode":
-            cred, err = retrieveLinodeCredentials()
-        default:
-            return nil, fmt.Errorf("unsupported provider: %s", provider)
-        }
+		switch provider {
+		case "AWS":
+			cred, err = retrieveAWSCredentials()
+		case "Azure":
+			cred, err = retrieveAzureCredentials()
+		case "GCP":
+			cred, err = retrieveGCPCredentials()
+		case "Linode":
+			cred, err = retrieveLinodeCredentials()
+		default:
+			return nil, fmt.Errorf("unsupported provider: %s", provider)
+		}
 
-        if err != nil {
-            return nil, fmt.Errorf("error retrieving %s credentials: %v", provider, err)
-        }
-        if cred == nil {
-            return nil, fmt.Errorf("%s credentials not found", provider)
-        }
-        creds = append(creds, *cred)
-    }
+		if err != nil {
+			return nil, fmt.Errorf("error retrieving %s credentials: %v", provider, err)
+		}
+		if cred == nil {
+			return nil, fmt.Errorf("%s credentials not found", provider)
+		}
+		creds = append(creds, *cred)
+	}
 
-    return creds, nil
+	return creds, nil
 }

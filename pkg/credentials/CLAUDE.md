@@ -8,7 +8,8 @@ Discovers and retrieves cloud provider credentials from environment variables an
 
 | File | Description |
 |------|-------------|
-| `retrieve.go` | Central dispatcher: `RetrieveAll()` and `RetrieveSelected()` |
+| `retrieve.go` | Central dispatcher: `RetrieveAll()` and `RetrieveSelected()`, plus `logCredentialDiscovery()` helper |
+| `retrieve_test.go` | Tests for logCredentialDiscovery helper |
 | `linode.go` | Reads `LINODE_ACCESS_TOKEN` env var or `~/.config/linode-cli` |
 | `aws.go` | Reads `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` env vars or `~/.aws/credentials` |
 | `azure.go` | Stub — not yet implemented |

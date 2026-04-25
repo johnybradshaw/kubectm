@@ -5,90 +5,110 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Test Commands
 
 ```bash
-# Build the binary (module is `kubectm`, entry point under ./cmd)
+# Build the binary
 go build -o kubectm ./cmd
 
 # Vet the code
 go vet ./...
 
-# Run tests with the same flags CI uses (.github/workflows/build.yml)
+# Run tests with coverage
 go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+# Display coverage report
 go tool cover -func=coverage.out
 
-# Run a single package or pattern
-go test -v ./pkg/kubeconfig/...
+# Run a single test file
+go test -v ./pkg/kubeconfig/merge_test.go ./pkg/kubeconfig/merge.go
+
+# Run tests matching a pattern
 go test -v -run TestMerge ./pkg/kubeconfig/...
 
-# After changing imports, regenerate go.sum via modules (never hand-edit go.sum — a hook blocks it)
-go mod tidy
-
-# Cross-compile — release uses `-ldflags "-X main.Version=<ver>"`
-GOOS=linux  GOARCH=amd64 go build -ldflags "-X main.Version=dev" -o kubectm-linux-amd64   ./cmd
-GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.Version=dev" -o kubectm-darwin-arm64  ./cmd
-GOOS=windows GOARCH=amd64 go build -ldflags "-X main.Version=dev" -o kubectm-windows-amd64.exe ./cmd
+# Cross-compile for different platforms
+GOOS=linux GOARCH=amd64 go build -o kubectm-linux-amd64 ./cmd
+GOOS=darwin GOARCH=arm64 go build -o kubectm-darwin-arm64 ./cmd
+GOOS=windows GOARCH=amd64 go build -o kubectm-windows-amd64.exe ./cmd
 ```
 
 ## Architecture Overview
 
-kubectm is a CLI tool that discovers cloud-provider credentials, downloads their kubeconfigs, and merges them into `~/.kube/config`.
+kubectm is a CLI tool that downloads and merges Kubernetes configurations from cloud providers into `~/.kube/config`.
 
-### Package layout
+### Package Structure
 
-- **cmd/main.go** — flag parsing, persistence of the selected-provider list, and the overall orchestration. Fatal errors are logged here; packages below return errors.
-- **pkg/credentials/** — per-provider credential discovery (`retrieve.go` dispatches to `aws.go`, `linode.go`, stubs for `azure.go`/`gcp.go`).
-- **pkg/kubeconfig/** — per-provider download (`download.go` dispatches to `linode.go`, `aws.go`), plus `merge.go` and the embedded `lke.png` for the Aptakube extension.
-- **pkg/ui/prompt.go** — `survey/v2` multi-select for picking providers.
-- **pkg/utils/logging.go** — shared `InfoLogger`/`WarnLogger`/`ErrorLogger`/`ActionLogger`, `Iso8601Time()`, and `ObfuscateCredential()`.
+- **cmd/main.go** - Entry point. Handles CLI flags, loads/saves selected providers to `~/.kubectm/selected_providers.json`, orchestrates credential retrieval and kubeconfig operations.
 
-Each `pkg/*` directory has its own `CLAUDE.md` with finer-grained conventions — read those before non-trivial edits to that module.
+- **pkg/credentials/** - Provider credential discovery
+  - `retrieve.go` - Central dispatcher with `RetrieveAll()` and `RetrieveSelected()` functions; includes `logCredentialDiscovery()` helper for obfuscated logging
+  - `linode.go` - Reads from `LINODE_ACCESS_TOKEN` env var or `~/.config/linode-cli` config file
+  - `aws.go` - Reads from `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` env vars or `~/.aws/credentials` file
+  - `azure.go`, `gcp.go` - Stub implementations (not yet functional)
 
-### Runtime data flow
+- **pkg/kubeconfig/** - Kubeconfig operations
+  - `download.go` - Dispatcher that routes to provider-specific downloaders (Linode, AWS)
+  - `linode.go` - Calls Linode API (`/lke/clusters` and `/lke/clusters/{id}/kubeconfig`) to fetch kubeconfigs
+  - `aws.go` - Downloads EKS kubeconfigs: auto-discovers regions via EC2 DescribeRegions, lists/describes EKS clusters in parallel, generates exec-based kubeconfigs using `aws eks get-token`
+  - `merge.go` - Merges `.yaml` files from `~/.kube/` into the main config, handles context naming conflicts, adds Aptakube extension for Linode icon
+  - `rename.go` - Stub for renaming clusters and contexts in kubeconfig files
+  - `lke.png` - Embedded Linode icon (via `//go:embed`)
 
-1. `cmd/main.go` loads the saved provider list from **`~/.kubectm/selected_providers.json`** (written by `SaveSelectedCredentialProviders`). If missing, or `--reset-creds` was passed, it falls back to `credentials.RetrieveAll()` → `ui.SelectCredentials()` → save.
-   - Caveat: `--reset-creds` deletes `~/.kubectm/selected_credentials.json` (the `storedCredsPath` constant), which is **not** the file the load/save functions use — leave this as-is unless the user asks for a fix.
-2. `credentials.RetrieveSelected(providers)` fails fast: any missing/failed selected provider aborts the run. `RetrieveAll` is tolerant — failures are logged and skipped.
-3. `kubeconfig.DownloadConfigs` routes each `Credential` to its provider downloader; configs are written to `~/.kube/<label>-kubeconfig.yaml`.
-4. `kubeconfig.MergeConfigs` merges every `*.yaml` in `~/.kube/` into `~/.kube/config`, resolves context conflicts, adds the Aptakube extension for Linode contexts, then deletes the temporary `*-kubeconfig.yaml` files.
+- **pkg/ui/prompt.go** - Interactive multi-select for credential providers using `survey/v2`
 
-### Provider integrations
+- **pkg/utils/logging.go** - Shared loggers (`InfoLogger`, `WarnLogger`, `ErrorLogger`, `ActionLogger`) with colored prefixes
 
-- **Linode LKE** — `GET /v4/lke/clusters` and `/v4/lke/clusters/{id}/kubeconfig`, Bearer-token auth from `LINODE_ACCESS_TOKEN` or `~/.config/linode-cli`.
-- **AWS EKS** — AWS SDK v2. Auto-discovers regions via `EC2 DescribeRegions` (overridable by `aws_regions` in `~/.kubectm/config.json`), then `EKS ListClusters` + `DescribeCluster` across up to 5 parallel regions with a 30s total timeout. Generated kubeconfigs use an `exec` block calling `aws eks get-token`; contexts are named `{cluster}@{region}`. See `TODOS.md` for the architectural decisions locked in at v0.1.0.
-- **Azure / GCP** — `pkg/credentials/{azure,gcp}.go` are stubs; no downloader exists.
+### Data Flow
 
-### Conventions that cross packages
+1. On first run: discover all available credentials → prompt user to select → save selection to `~/.kubectm/selected_providers.json`
+2. On subsequent runs: load saved provider selection → retrieve credentials for those providers
+3. For each provider: download kubeconfigs to `~/.kube/{label}-kubeconfig.yaml`
+4. Merge all `.yaml` files into `~/.kube/config`, then delete the temporary files
 
-- **Error handling** — packages return errors; only `cmd/main.go` calls `Fatal*`. `utils.init()` redirects the standard `log` package to `io.Discard`, so raw `log.Printf` output is silently dropped — always use the `utils.*Logger` variables.
-- **Logging format** — every log line starts with `utils.Iso8601Time()` followed by the message.
-- **Credential obfuscation** — any credential value hitting logs must go through `utils.ObfuscateCredential()`; the `logCredentialDiscovery` helper in `pkg/credentials/retrieve.go` is the canonical pattern.
-- **Path-traversal guard** — anything writing under `~/.kube/` (or `~/.kubectm/`) must validate the final path with `filepath.Clean` + `strings.HasPrefix` against the expected root. `pkg/kubeconfig/merge.go` is the reference.
-- **Context-merge rules** — same cluster + same context name: skip; different cluster + same context name: overwrite (documented in `pkg/kubeconfig/CLAUDE.md`).
+### Linode API Integration
 
-## Project-local Claude Code extensions (`.claude/`)
+The Linode provider uses API v4 (`https://api.linode.com/v4`):
+- `GET /lke/clusters` - List all LKE clusters
+- `GET /lke/clusters/{clusterId}/kubeconfig` - Get base64-encoded kubeconfig
 
-- **Slash commands** (`.claude/skills/*/SKILL.md`):
-  - `/add-provider <Name>` — scaffolds `pkg/credentials/<name>.go`, `pkg/kubeconfig/<name>.go`, wires both dispatchers, and updates module CLAUDE.md tables. Follow it rather than scaffolding by hand.
-  - `/code-review` — diff-based review against these conventions.
-  - `/refactor <target>` — behaviour-preserving refactor that runs `go test -race -count=1` before and after.
-  - `/release <vX.Y.Z>` — validates preconditions, tags, and pushes to trigger CI. CI (not local) produces signatures and attestations.
-- **Subagents** (`.claude/agents/`): `security-reviewer` (credential/file/API review) and `test-writer` (table-driven Go tests following existing patterns in `pkg/credentials/aws_test.go`, `pkg/kubeconfig/merge_test.go`, `pkg/kubeconfig/linode_test.go`).
-- **Hooks** (`.claude/settings.json`):
-  - `PostToolUse` on `Edit`/`Write`: auto-runs `gofmt -w` on `*.go`, then `go vet ./...` (first 20 lines). Expect formatting to happen after each edit.
-  - `PreToolUse` blocks direct edits to `go.sum`, `*.age`, and `*.key` files — use `go mod tidy` for the first, and do not attempt the others.
-  - Bash auto-allowlist covers `go test|build|vet`, `gofmt`, and `go mod tidy`.
+Authentication via Bearer token from either `LINODE_ACCESS_TOKEN` env var or `linode-cli` config.
 
-## Test-writing conventions
+### AWS EKS Integration
 
-- Table-driven with `t.Run` subtests; name tests `Test<Func>` / `Test<Func>_<scenario>`; helpers call `t.Helper()`; parallelise with `t.Parallel()` when safe.
-- Use `t.TempDir()` for filesystem work and `t.Setenv()` for environment manipulation — never touch the real `~/.kube/` or `~/.aws/` from tests.
-- External APIs are mocked with `httptest.NewServer` (see `pkg/kubeconfig/linode_test.go` and `aws_test.go`).
+The AWS provider uses AWS SDK v2:
+- `EC2 DescribeRegions` - Auto-discover enabled regions (with optional `~/.kubectm/config.json` override)
+- `EKS ListClusters` - List cluster names per region (with pagination)
+- `EKS DescribeCluster` - Get cluster endpoint + CA certificate
 
-## CLI surface
+Regions are scanned in parallel (concurrency=5, 30s timeout). Generated kubeconfigs use the `aws eks get-token` exec plugin for authentication. Context naming: `{cluster-name}@{region}`.
 
-- `-h`/`--help` — help.
-- `-v`/`--version` — prints the value injected via `-ldflags -X main.Version=...` (defaults to `development`).
-- `--reset-creds` — removes the stored credential-selection file and re-prompts.
+Authentication via static credentials from the discovered `Credential.Details` (AccessKey, SecretKey, optional SessionToken).
 
-## CI / Release
+## Key Dependencies
 
-`.github/workflows/build.yml` runs `go test -race -coverprofile ...` on every push to `main` and on PRs. On `v*` tags it additionally runs Snyk, builds the 3×2 matrix with version-injected `ldflags`, signs the binaries with GPG (`secrets.GPG_PRIVATE_KEY`/`GPG_PASSPHRASE`), publishes a GitHub Release, and produces SLSA build-provenance attestations (`actions/attest-build-provenance`). Prefer driving releases through `/release` rather than tagging manually.
+- `k8s.io/client-go` - Kubernetes client library for kubeconfig handling
+- `k8s.io/apimachinery` - Kubernetes API types
+- `github.com/aws/aws-sdk-go-v2` - AWS SDK for EC2/EKS API calls
+- `github.com/AlecAivazis/survey/v2` - Interactive prompts
+- `github.com/fatih/color` - Colored terminal output
+
+## Key Patterns
+
+- Path traversal protection: All file operations in `merge.go` validate paths are within `~/.kube/`
+- Credential obfuscation: `utils.ObfuscateCredential()` masks sensitive values in logs
+- Context conflict resolution: When merging, same-cluster contexts are skipped; different-cluster same-name contexts are overwritten
+- Version injection: Build with `-ldflags "-X main.Version=..."` for release versioning
+- Logging: Use the predefined loggers with ISO 8601 timestamps
+- Error Handling: Return errors rather than fatal logging in package functions; let main handle fatal errors
+
+## CLI Flags
+
+- `-h, --help`: Show help message
+- `-v, --version`: Show version
+- `--reset-creds`: Reset stored credentials and prompt for new ones
+
+## Release Process
+
+Releases are automated via GitHub Actions when a version tag (`v*`) is pushed:
+1. Tests run first
+2. Security scan with Snyk
+3. Cross-platform builds (linux/darwin/windows × amd64/arm64)
+4. GPG signature generation
+5. GitHub release with attestation

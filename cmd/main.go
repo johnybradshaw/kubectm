@@ -15,11 +15,10 @@ import (
 	"time"
 )
 
-const (
-	// Version is set during build time using -ldflags
-	version         = "development"
-	storedCredsPath = ".kubectm/selected_credentials.json"
-)
+// Version is set during build time using -ldflags "-X main.Version=<tag>"
+var Version = "development"
+
+const storedCredsPath = ".kubectm/selected_providers.json"
 
 var (
 	infoLogger   = log.New(os.Stdout, color.GreenString("[INFO] "), 0)
@@ -213,7 +212,7 @@ func main() {
 	}
 
 	if showVersion {
-		color.Cyan("kubectm version %s\n", version)
+		color.Cyan("kubectm version %s\n", Version)
 		os.Exit(0)
 	}
 

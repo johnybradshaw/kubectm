@@ -35,7 +35,7 @@ kubectm is a CLI tool that downloads and merges Kubernetes configurations from c
 
 ### Package Structure
 
-- **cmd/main.go** - Entry point. Handles CLI flags, loads/saves selected providers to `~/.kubectm/selected_credentials.json`, orchestrates credential retrieval and kubeconfig operations.
+- **cmd/main.go** - Entry point. Handles CLI flags, loads/saves selected providers to `~/.kubectm/selected_providers.json`, orchestrates credential retrieval and kubeconfig operations.
 
 - **pkg/credentials/** - Provider credential discovery
   - `retrieve.go` - Central dispatcher with `RetrieveAll()` and `RetrieveSelected()` functions; includes `logCredentialDiscovery()` helper for obfuscated logging
@@ -57,7 +57,7 @@ kubectm is a CLI tool that downloads and merges Kubernetes configurations from c
 
 ### Data Flow
 
-1. On first run: discover all available credentials → prompt user to select → save selection to `~/.kubectm/selected_credentials.json`
+1. On first run: discover all available credentials → prompt user to select → save selection to `~/.kubectm/selected_providers.json`
 2. On subsequent runs: load saved provider selection → retrieve credentials for those providers
 3. For each provider: download kubeconfigs to `~/.kube/{label}-kubeconfig.yaml`
 4. Merge all `.yaml` files into `~/.kube/config`, then delete the temporary files

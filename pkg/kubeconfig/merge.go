@@ -250,8 +250,11 @@ func mergeAuthInfos(dest, src map[string]*api.AuthInfo) {
 // handleExistingContext checks if an existing context should be skipped or overwritten
 // Returns: shouldSkip, shouldOverwrite
 func handleExistingContext(dest, src *api.Config, contextName string, context *api.Context, imagePath string) (bool, bool) {
+    if context == nil {
+        return false, false
+    }
     existingContext, exists := dest.Contexts[contextName]
-    if !exists {
+    if !exists || existingContext == nil {
         return false, false
     }
 
@@ -278,6 +281,9 @@ func handleExistingContext(dest, src *api.Config, contextName string, context *a
 // ensureAptakubeExtension adds or updates the Aptakube icon extension on the
 // given context, preserving any other extensions already present.
 func ensureAptakubeExtension(context *api.Context, imagePath string) {
+    if context == nil {
+        return
+    }
     if context.Extensions == nil {
         context.Extensions = map[string]runtime.Object{}
     }
@@ -286,6 +292,9 @@ func ensureAptakubeExtension(context *api.Context, imagePath string) {
 
 // createContextWithExtension creates a new context with the Aptakube extension
 func createContextWithExtension(context *api.Context, imagePath string) *api.Context {
+    if context == nil {
+        return nil
+    }
     newContext := *context
     // Copy any existing extensions into a fresh map so the source context is not
     // mutated, then add the Aptakube icon extension.
@@ -303,6 +312,9 @@ func mergeKubeconfigs(dest, src *api.Config, contextName string, imagePath strin
     mergeAuthInfos(dest.AuthInfos, src.AuthInfos)
 
     for key, context := range src.Contexts {
+        if context == nil {
+            continue
+        }
         shouldSkip, shouldOverwrite := handleExistingContext(dest, src, contextName, context, imagePath)
         if shouldSkip {
             continue

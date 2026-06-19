@@ -8,6 +8,7 @@ import (
     "net/http"
     "os"
     "path/filepath"
+    "strings"
     "github.com/fatih/color"
     "kubectm/pkg/credentials"
     "kubectm/pkg/utils"  // Import the utils package
@@ -187,17 +188,34 @@ func saveKubeconfigToFile(clusterLabel string, kubeconfig string) error {
     if err != nil {
         return err
     }
-
-    // Create the ~/.kube directory if it doesn't exist
-    kubeconfigDir := filepath.Join(homeDir, ".kube")
-    err = os.MkdirAll(kubeconfigDir, os.ModePerm)
+    absHomeDir, err := filepath.Abs(filepath.Clean(homeDir))
     if err != nil {
         return err
     }
 
-    // Create the file name by appending the cluster label to the
-    // "kubeconfig.yaml" string
-    kubeconfigFile := filepath.Join(kubeconfigDir, fmt.Sprintf("%s-kubeconfig.yaml", clusterLabel))
+    // The cluster label originates from a cloud provider API response and is
+    // therefore untrusted. Reject any value containing a path separator so it
+    // cannot be used to escape the ~/.kube directory (path traversal).
+    if strings.ContainsAny(clusterLabel, `/\`) || strings.Contains(clusterLabel, "..") {
+        return fmt.Errorf("invalid cluster label %q: must not contain path separators", clusterLabel)
+    }
+
+    // Create the ~/.kube directory with 0700 so the directory holding
+    // credential-bearing kubeconfig files is not readable by other users.
+    // Verify it resolves within the home directory before creating it.
+    kubeconfigDir := filepath.Clean(filepath.Join(absHomeDir, ".kube"))
+    if rel, relErr := filepath.Rel(absHomeDir, kubeconfigDir); relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+        return fmt.Errorf("invalid kube directory outside home: %s", kubeconfigDir)
+    }
+    if err = os.MkdirAll(kubeconfigDir, 0700); err != nil {
+        return err
+    }
+
+    // Build the destination file and confirm it stays inside ~/.kube before writing.
+    kubeconfigFile := filepath.Clean(filepath.Join(kubeconfigDir, fmt.Sprintf("%s-kubeconfig.yaml", clusterLabel)))
+    if rel, relErr := filepath.Rel(kubeconfigDir, kubeconfigFile); relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+        return fmt.Errorf("invalid kubeconfig path outside .kube directory: %s", kubeconfigFile)
+    }
 
     // Write the kubeconfig string to the file
     err = os.WriteFile(kubeconfigFile, []byte(kubeconfig), 0600)

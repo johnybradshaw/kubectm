@@ -140,12 +140,24 @@ func resetStoredCredentials() {
 	if err != nil {
 		errorLogger.Fatalf("%s Failed to get user home directory: %v", iso8601Time(), err)
 	}
-	homeDir = filepath.Clean(homeDir)
-	configFile := filepath.Join(homeDir, storedCredsPath)
-	if !strings.HasPrefix(configFile, homeDir) {
-		errorLogger.Fatalf("%s Invalid credentials path: %s", iso8601Time(), configFile)
+
+	absHomeDir, err := filepath.Abs(filepath.Clean(homeDir))
+	if err != nil {
+		errorLogger.Fatalf("%s Failed to resolve home directory: %v", iso8601Time(), err)
 	}
-	err = os.Remove(configFile)
+
+	configFile := filepath.Join(absHomeDir, storedCredsPath)
+	absConfigFile, err := filepath.Abs(filepath.Clean(configFile))
+	if err != nil {
+		errorLogger.Fatalf("%s Failed to resolve credentials path: %v", iso8601Time(), err)
+	}
+
+	relPath, err := filepath.Rel(absHomeDir, absConfigFile)
+	if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
+		errorLogger.Fatalf("%s Invalid credentials path: %s", iso8601Time(), absConfigFile)
+	}
+
+	err = os.Remove(absConfigFile)
 	if err != nil && !os.IsNotExist(err) {
 		errorLogger.Fatalf("%s Failed to reset stored credentials: %v", iso8601Time(), err)
 	}

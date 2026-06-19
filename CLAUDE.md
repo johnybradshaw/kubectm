@@ -108,7 +108,6 @@ Authentication via static credentials from the discovered `Credential.Details` (
 
 Releases are automated via GitHub Actions when a version tag (`v*`) is pushed:
 1. Tests run first
-2. Security scan with Snyk
-3. Cross-platform builds (linux/darwin/windows × amd64/arm64)
-4. GPG signature generation
-5. GitHub release with attestation
+2. Cross-platform builds (linux/darwin/windows × amd64/arm64)
+3. GPG signature generation
+4. GitHub release with attestation

@@ -157,24 +157,17 @@ func resetStoredCredentials() {
 		errorLogger.Fatalf("%s Failed to get user home directory: %v", iso8601Time(), err)
 	}
 
-	absHomeDir, err := filepath.Abs(filepath.Clean(homeDir))
+	// Confine all path resolution to the home directory with os.Root. Root
+	// operations cannot escape the root (".." and absolute paths are rejected),
+	// which removes the path-traversal concern by construction rather than via
+	// after-the-fact string checks.
+	root, err := os.OpenRoot(homeDir)
 	if err != nil {
-		errorLogger.Fatalf("%s Failed to resolve home directory: %v", iso8601Time(), err)
+		errorLogger.Fatalf("%s Failed to open home directory: %v", iso8601Time(), err)
 	}
+	defer root.Close()
 
-	configFile := filepath.Join(absHomeDir, storedCredsPath)
-	absConfigFile, err := filepath.Abs(filepath.Clean(configFile))
-	if err != nil {
-		errorLogger.Fatalf("%s Failed to resolve credentials path: %v", iso8601Time(), err)
-	}
-
-	relPath, err := filepath.Rel(absHomeDir, absConfigFile)
-	if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
-		errorLogger.Fatalf("%s Invalid credentials path: %s", iso8601Time(), absConfigFile)
-	}
-
-	err = os.Remove(absConfigFile)
-	if err != nil && !os.IsNotExist(err) {
+	if err := root.Remove(filepath.FromSlash(storedCredsPath)); err != nil && !os.IsNotExist(err) {
 		errorLogger.Fatalf("%s Failed to reset stored credentials: %v", iso8601Time(), err)
 	}
 	warnLogger.Printf("%s Stored credentials have been reset. You'll be prompted to select credentials.", iso8601Time())

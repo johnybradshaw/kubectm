@@ -25,10 +25,15 @@ func retrieveLinodeCredentials() (*Credential, error) {
         }, nil
     }
 
-    configDirPath := filepath.Join(os.Getenv("HOME"), ".config", "linode-cli")
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        utils.ErrorLogger.Printf("%s Error determining home directory: %v", utils.Iso8601Time(), err)
+        return nil, fmt.Errorf("error determining home directory")
+    }
+    configDirPath := filepath.Join(homeDir, ".config", "linode-cli")
     utils.InfoLogger.Printf("%s Looking for Linode config in directory: %s", utils.Iso8601Time(), configDirPath)
 
-    _, err := os.Stat(configDirPath)
+    _, err = os.Stat(configDirPath)
     if os.IsNotExist(err) {
         utils.WarnLogger.Printf("%s Linode config directory not found: %v", utils.Iso8601Time(), err)
         return nil, fmt.Errorf("linode config directory not found")
@@ -80,7 +85,9 @@ func parseLinodeConfig(configContent []byte, profile string) string {
             inSection = false
         }
 
-        if inSection && strings.HasPrefix(line, "token") {
+        // Match the token key case-insensitively so a differently-cased key
+        // (e.g. "Token") is still recognised and never logged in clear text.
+        if inSection && strings.HasPrefix(strings.ToLower(line), "token") {
             parts := strings.Split(line, "=")
             if len(parts) == 2 {
                 token := strings.TrimSpace(parts[1])
@@ -88,9 +95,8 @@ func parseLinodeConfig(configContent []byte, profile string) string {
                 utils.InfoLogger.Printf("%s Access token found: %s", utils.Iso8601Time(), obfuscatedToken)
                 return token
             }
-        } else {
-            utils.InfoLogger.Printf("%s Parsing non-sensitive line: %s", utils.Iso8601Time(), line)
         }
+        // Other lines in the config may contain sensitive values; do not log them.
     }
     return ""
 }

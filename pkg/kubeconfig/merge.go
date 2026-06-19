@@ -41,16 +41,16 @@ func saveImage() (string, error) {
         return "", err
     }
 
-    if !strings.HasPrefix(kubeconfigDir, homeDir) {
+    if !strings.HasPrefix(kubeconfigDir, homeDir+string(filepath.Separator)) {
         return "", fmt.Errorf("invalid directory path outside user home")
     }
 
-    if err := os.MkdirAll(kubeconfigDir, os.ModePerm); err != nil {
+    if err := os.MkdirAll(kubeconfigDir, 0700); err != nil {
         return "", fmt.Errorf("failed to create kubeconfig directory: %v", err)
     }
 
     imagePath := filepath.Join(kubeconfigDir, "lke.png")
-    if !strings.HasPrefix(imagePath, kubeconfigDir) {
+    if !strings.HasPrefix(imagePath, kubeconfigDir+string(filepath.Separator)) {
         return "", fmt.Errorf("invalid image path outside .kube directory")
     }
 

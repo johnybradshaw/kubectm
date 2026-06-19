@@ -69,7 +69,7 @@ func SaveSelectedCredentialProviders(providers []string) error {
 
 	// Create the .kubectm directory if it doesn't exist
 	configDir := filepath.Join(homeDir, ".kubectm")
-	if !strings.HasPrefix(configDir, homeDir) {
+	if !strings.HasPrefix(configDir, homeDir+string(filepath.Separator)) {
 		return fmt.Errorf("invalid config directory path: %s", configDir)
 	}
 	err = os.MkdirAll(configDir, 0700)
@@ -79,10 +79,12 @@ func SaveSelectedCredentialProviders(providers []string) error {
 
 	// Create the selected_providers.json file if it doesn't exist, or overwrite it if it does
 	configFile := filepath.Join(configDir, "selected_providers.json")
-	if !strings.HasPrefix(configFile, configDir) {
+	if !strings.HasPrefix(configFile, configDir+string(filepath.Separator)) {
 		return fmt.Errorf("invalid config file path: %s", configFile)
 	}
-	file, err := os.Create(configFile)
+	// Use explicit 0600 permissions instead of os.Create's default 0666 so the
+	// provider selection file is not readable by other users on the system.
+	file, err := os.OpenFile(configFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -108,7 +110,7 @@ func LoadSelectedCredentialProviders() ([]string, error) {
 
 	// Construct the path to the selected_providers.json file
 	configFile := filepath.Join(homeDir, ".kubectm", "selected_providers.json")
-	if !strings.HasPrefix(configFile, homeDir) {
+	if !strings.HasPrefix(configFile, homeDir+string(filepath.Separator)) {
 		return nil, fmt.Errorf("invalid config file path: %s", configFile)
 	}
 

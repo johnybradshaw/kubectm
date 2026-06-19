@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"text/template"
@@ -257,6 +258,17 @@ func processEKSCluster(ctx context.Context, client *eks.Client, clusterName, reg
 		return fmt.Errorf("cluster %s has incomplete data", clusterName)
 	}
 
+	// clusterName and region come from AWS API responses. Validate them against
+	// a strict allowlist before they are interpolated into the kubeconfig
+	// template (text/template performs no escaping) or used to build a file
+	// path, preventing YAML injection and path traversal.
+	if !isValidEKSIdentifier(clusterName) {
+		return fmt.Errorf("cluster %q has an unexpected name format", clusterName)
+	}
+	if !isValidEKSIdentifier(region) {
+		return fmt.Errorf("cluster %s is in an unexpected region format %q", clusterName, region)
+	}
+
 	contextName := fmt.Sprintf("%s@%s", clusterName, region)
 	utils.ActionLogger.Printf("%s Downloading kubeconfig for EKS cluster: %s",
 		utils.Iso8601Time(), color.New(color.Bold).Sprint(contextName))
@@ -269,6 +281,17 @@ func processEKSCluster(ctx context.Context, client *eks.Client, clusterName, reg
 	)
 
 	return saveKubeconfigToFile(contextName, kubeconfigContent)
+}
+
+// eksIdentifierPattern matches the characters allowed in EKS cluster names and
+// AWS region identifiers. Both are restricted to alphanumerics and a small set
+// of separators, which excludes whitespace, YAML metacharacters and path
+// separators.
+var eksIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+// isValidEKSIdentifier reports whether s is a safe EKS cluster name or region.
+func isValidEKSIdentifier(s string) bool {
+	return s != "" && eksIdentifierPattern.MatchString(s)
 }
 
 // eksKubeconfigTemplate is the template for generating EKS kubeconfig files.

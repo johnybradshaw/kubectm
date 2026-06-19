@@ -167,7 +167,7 @@ func resetStoredCredentials() {
 	}
 	defer root.Close()
 
-	if err := root.Remove(filepath.FromSlash(storedCredsPath)); err != nil && !os.IsNotExist(err) {
+	if err := root.Remove(storedCredsPath); err != nil && !os.IsNotExist(err) {
 		errorLogger.Fatalf("%s Failed to reset stored credentials: %v", iso8601Time(), err)
 	}
 	warnLogger.Printf("%s Stored credentials have been reset. You'll be prompted to select credentials.", iso8601Time())

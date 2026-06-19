@@ -236,6 +236,39 @@ func TestMergeKubeconfigs(t *testing.T) {
 	}
 }
 
+// TestMergeKubeconfigsAddsExtensionToExistingContext verifies that a context
+// which already exists for the same cluster but lacks the Aptakube icon
+// extension gets it applied rather than being skipped entirely (issue #14).
+func TestMergeKubeconfigsAddsExtensionToExistingContext(t *testing.T) {
+	// Pre-existing context for the same cluster, with no extensions set.
+	destConfig := createTestConfig(testClusterNameMerge, testServerURL2, testCAData2, testUserName, testToken, testContextName, nil)
+	srcConfig := createTestConfig(testClusterNameMerge, testServerURL2, testCAData2, testUserName, testToken, testContextName, nil)
+
+	if err := mergeKubeconfigs(destConfig, srcConfig, testContextName, testIconPath); err != nil {
+		t.Fatalf("mergeKubeconfigs() error = %v", err)
+	}
+
+	if len(destConfig.Contexts) != 1 {
+		t.Fatalf("expected 1 context, got %d", len(destConfig.Contexts))
+	}
+
+	context := destConfig.Contexts[testContextName]
+	if context.Extensions == nil {
+		t.Fatal("expected pre-existing context to gain extensions, got nil")
+	}
+	ext, exists := context.Extensions["aptakube"]
+	if !exists {
+		t.Fatal("expected pre-existing context to gain the aptakube extension")
+	}
+	aptakube, ok := ext.(*AptakubeExtension)
+	if !ok {
+		t.Fatalf("expected *AptakubeExtension, got %T", ext)
+	}
+	if aptakube.IconURL != testIconPath {
+		t.Errorf("expected icon URL %q, got %q", testIconPath, aptakube.IconURL)
+	}
+}
+
 // TestMakeContextNameUnique tests the makeContextNameUnique function
 func TestMakeContextNameUnique(t *testing.T) {
 	tests := []struct {

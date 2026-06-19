@@ -152,23 +152,24 @@ func LoadSelectedCredentialProviders() ([]string, error) {
 
 // resetStoredCredentials removes the stored credentials file to force re-prompting
 func resetStoredCredentials() {
-	homeDir, err := os.UserHomeDir()
+	configDir, err := os.UserConfigDir()
 	if err != nil {
-		errorLogger.Fatalf("%s Failed to get user home directory: %v", iso8601Time(), err)
+		errorLogger.Fatalf("%s Failed to get user config directory: %v", iso8601Time(), err)
 	}
 
-	absHomeDir, err := filepath.Abs(filepath.Clean(homeDir))
+	absConfigDir, err := filepath.Abs(filepath.Clean(configDir))
 	if err != nil {
-		errorLogger.Fatalf("%s Failed to resolve home directory: %v", iso8601Time(), err)
+		errorLogger.Fatalf("%s Failed to resolve config directory: %v", iso8601Time(), err)
 	}
 
-	configFile := filepath.Join(absHomeDir, storedCredsPath)
+	safeBaseDir := filepath.Join(absConfigDir, "kubectm")
+	configFile := filepath.Join(safeBaseDir, storedCredsPath)
 	absConfigFile, err := filepath.Abs(filepath.Clean(configFile))
 	if err != nil {
 		errorLogger.Fatalf("%s Failed to resolve credentials path: %v", iso8601Time(), err)
 	}
 
-	relPath, err := filepath.Rel(absHomeDir, absConfigFile)
+	relPath, err := filepath.Rel(safeBaseDir, absConfigFile)
 	if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
 		errorLogger.Fatalf("%s Invalid credentials path: %s", iso8601Time(), absConfigFile)
 	}

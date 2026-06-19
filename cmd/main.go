@@ -68,8 +68,12 @@ func SaveSelectedCredentialProviders(providers []string) error {
 	homeDir = filepath.Clean(homeDir)
 
 	// Create the .kubectm directory if it doesn't exist
-	configDir := filepath.Join(homeDir, ".kubectm")
-	if !strings.HasPrefix(configDir, homeDir+string(filepath.Separator)) {
+	absHomeDir, err := filepath.Abs(filepath.Clean(homeDir))
+	if err != nil {
+		return err
+	}
+	configDir := filepath.Clean(filepath.Join(absHomeDir, ".kubectm"))
+	if rel, relErr := filepath.Rel(absHomeDir, configDir); relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return fmt.Errorf("invalid config directory path: %s", configDir)
 	}
 	err = os.MkdirAll(configDir, 0700)
@@ -78,14 +82,20 @@ func SaveSelectedCredentialProviders(providers []string) error {
 	}
 
 	// Create the selected_providers.json file if it doesn't exist, or overwrite it if it does
-	configFile := filepath.Join(configDir, "selected_providers.json")
-	if !strings.HasPrefix(configFile, configDir+string(filepath.Separator)) {
+	configFile := filepath.Clean(filepath.Join(configDir, "selected_providers.json"))
+	if rel, relErr := filepath.Rel(configDir, configFile); relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return fmt.Errorf("invalid config file path: %s", configFile)
 	}
 	// Use explicit 0600 permissions instead of os.Create's default 0666 so the
 	// provider selection file is not readable by other users on the system.
 	file, err := os.OpenFile(configFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
+		return err
+	}
+	// os.OpenFile does not tighten permissions on a pre-existing file, so force
+	// 0600 explicitly to avoid leaving a previously looser-permissioned file exposed.
+	if err := file.Chmod(0600); err != nil {
+		file.Close()
 		return err
 	}
 	defer file.Close()
@@ -109,8 +119,12 @@ func LoadSelectedCredentialProviders() ([]string, error) {
 	homeDir = filepath.Clean(homeDir)
 
 	// Construct the path to the selected_providers.json file
-	configFile := filepath.Join(homeDir, ".kubectm", "selected_providers.json")
-	if !strings.HasPrefix(configFile, homeDir+string(filepath.Separator)) {
+	absHomeDir, err := filepath.Abs(filepath.Clean(homeDir))
+	if err != nil {
+		return nil, err
+	}
+	configFile := filepath.Clean(filepath.Join(absHomeDir, ".kubectm", "selected_providers.json"))
+	if rel, relErr := filepath.Rel(absHomeDir, configFile); relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return nil, fmt.Errorf("invalid config file path: %s", configFile)
 	}
 

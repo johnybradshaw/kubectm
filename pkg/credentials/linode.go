@@ -30,7 +30,17 @@ func retrieveLinodeCredentials() (*Credential, error) {
         utils.ErrorLogger.Printf("%s Error determining home directory: %v", utils.Iso8601Time(), err)
         return nil, fmt.Errorf("error determining home directory")
     }
-    configDirPath := filepath.Join(homeDir, ".config", "linode-cli")
+    absHomeDir, err := filepath.Abs(filepath.Clean(homeDir))
+    if err != nil {
+        utils.ErrorLogger.Printf("%s Error resolving home directory: %v", utils.Iso8601Time(), err)
+        return nil, fmt.Errorf("error resolving home directory")
+    }
+    configDirPath := filepath.Clean(filepath.Join(absHomeDir, ".config", "linode-cli"))
+    // Confirm the resolved path stays within the home directory before any
+    // filesystem access (defends against a tampered HOME environment variable).
+    if rel, relErr := filepath.Rel(absHomeDir, configDirPath); relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+        return nil, fmt.Errorf("invalid linode config path: %s", configDirPath)
+    }
     utils.InfoLogger.Printf("%s Looking for Linode config in directory: %s", utils.Iso8601Time(), configDirPath)
 
     _, err = os.Stat(configDirPath)
@@ -85,18 +95,18 @@ func parseLinodeConfig(configContent []byte, profile string) string {
             inSection = false
         }
 
-        // Match the token key case-insensitively so a differently-cased key
-        // (e.g. "Token") is still recognised and never logged in clear text.
-        if inSection && strings.HasPrefix(strings.ToLower(line), "token") {
-            parts := strings.Split(line, "=")
-            if len(parts) == 2 {
+        // Match the "token" key exactly (case-insensitive) and split into at
+        // most two parts so an "=" inside the value is preserved. Other config
+        // lines may contain sensitive values, so they are never logged.
+        if inSection {
+            parts := strings.SplitN(line, "=", 2)
+            if len(parts) == 2 && strings.TrimSpace(strings.ToLower(parts[0])) == "token" {
                 token := strings.TrimSpace(parts[1])
                 obfuscatedToken := utils.ObfuscateCredential(token)
                 utils.InfoLogger.Printf("%s Access token found: %s", utils.Iso8601Time(), obfuscatedToken)
                 return token
             }
         }
-        // Other lines in the config may contain sensitive values; do not log them.
     }
     return ""
 }

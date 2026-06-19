@@ -188,12 +188,7 @@ func saveKubeconfigToFile(clusterLabel string, kubeconfig string) error {
     if err != nil {
         return err
     }
-
-    // Create the ~/.kube directory if it doesn't exist. Use 0700 so the
-    // directory holding credential-bearing kubeconfig files is not readable
-    // by other users on the system.
-    kubeconfigDir := filepath.Clean(filepath.Join(homeDir, ".kube"))
-    err = os.MkdirAll(kubeconfigDir, 0700)
+    absHomeDir, err := filepath.Abs(filepath.Clean(homeDir))
     if err != nil {
         return err
     }
@@ -205,11 +200,20 @@ func saveKubeconfigToFile(clusterLabel string, kubeconfig string) error {
         return fmt.Errorf("invalid cluster label %q: must not contain path separators", clusterLabel)
     }
 
-    // Create the file name by appending the cluster label to the
-    // "kubeconfig.yaml" string, then confirm the resolved path stays inside
-    // the ~/.kube directory before writing.
+    // Create the ~/.kube directory with 0700 so the directory holding
+    // credential-bearing kubeconfig files is not readable by other users.
+    // Verify it resolves within the home directory before creating it.
+    kubeconfigDir := filepath.Clean(filepath.Join(absHomeDir, ".kube"))
+    if rel, relErr := filepath.Rel(absHomeDir, kubeconfigDir); relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+        return fmt.Errorf("invalid kube directory outside home: %s", kubeconfigDir)
+    }
+    if err = os.MkdirAll(kubeconfigDir, 0700); err != nil {
+        return err
+    }
+
+    // Build the destination file and confirm it stays inside ~/.kube before writing.
     kubeconfigFile := filepath.Clean(filepath.Join(kubeconfigDir, fmt.Sprintf("%s-kubeconfig.yaml", clusterLabel)))
-    if !strings.HasPrefix(kubeconfigFile, kubeconfigDir+string(filepath.Separator)) {
+    if rel, relErr := filepath.Rel(kubeconfigDir, kubeconfigFile); relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
         return fmt.Errorf("invalid kubeconfig path outside .kube directory: %s", kubeconfigFile)
     }
 

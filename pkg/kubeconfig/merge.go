@@ -41,7 +41,7 @@ func saveImage() (string, error) {
         return "", err
     }
 
-    if !strings.HasPrefix(kubeconfigDir, homeDir+string(filepath.Separator)) {
+    if rel, relErr := filepath.Rel(homeDir, kubeconfigDir); relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
         return "", fmt.Errorf("invalid directory path outside user home")
     }
 
@@ -49,8 +49,8 @@ func saveImage() (string, error) {
         return "", fmt.Errorf("failed to create kubeconfig directory: %v", err)
     }
 
-    imagePath := filepath.Join(kubeconfigDir, "lke.png")
-    if !strings.HasPrefix(imagePath, kubeconfigDir+string(filepath.Separator)) {
+    imagePath := filepath.Clean(filepath.Join(kubeconfigDir, "lke.png"))
+    if rel, relErr := filepath.Rel(kubeconfigDir, imagePath); relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
         return "", fmt.Errorf("invalid image path outside .kube directory")
     }
 

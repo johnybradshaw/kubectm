@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.305.0
 	github.com/aws/aws-sdk-go-v2/service/eks v1.84.3
 	github.com/fatih/color v1.19.0
-	k8s.io/apimachinery v0.36.1
+	k8s.io/apimachinery v0.36.2
 	k8s.io/client-go v0.36.1
 )
 

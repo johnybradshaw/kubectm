@@ -10,6 +10,11 @@
 
 ## Completed
 
+### P1: Backup before merge
+**What:** Back up `~/.kube/config` to `~/.kube/config.bak.{timestamp}` before the merge modifies it, keep the last N backups (configurable via `--backup-count`, default 5), and log the backup path.
+**Why:** A bad merge previously destroyed the existing kubeconfig with no way to recover (PRD §5.3).
+**Completed:** 2026-07-01
+
 ### P1: Implement AWS EKS kubeconfig download
 **What:** Implement full AWS EKS kubeconfig download using the architecture decisions from eng review (2026-03-20).
 **Why:** AWS EKS is the highest-priority missing provider. Credential discovery is done; download pipeline is the remaining gap.

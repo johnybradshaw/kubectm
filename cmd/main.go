@@ -42,9 +42,10 @@ func printUsage() {
 Usage: kubectm [options]
 
 Options:
-  -h, --help        Show this help message and exit.
-  -v, --version     Show the version of kubectm.
-  --reset-creds     Reset the stored credentials and prompt for new ones.
+  -h, --help          Show this help message and exit.
+  -v, --version       Show the version of kubectm.
+  --reset-creds       Reset the stored credentials and prompt for new ones.
+  --backup-count <n>  Number of kubeconfig backups to keep (default: 5).
 
 For more information and source code, visit:
 https://github.com/johnybradshaw/kubectm
@@ -219,12 +220,14 @@ func main() {
 	var showHelp bool
 	var showVersion bool
 	var resetCreds bool
+	var backupCount int
 
 	flag.BoolVar(&showHelp, "help", false, "Show help message")
 	flag.BoolVar(&showHelp, "h", false, "Show help message")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.BoolVar(&showVersion, "v", false, "Show version information")
 	flag.BoolVar(&resetCreds, "reset-creds", false, "Reset stored credentials and prompt for new ones")
+	flag.IntVar(&backupCount, "backup-count", kubeconfig.DefaultBackupCount, "Number of kubeconfig backups to keep")
 	flag.Parse()
 
 	if showHelp {
@@ -251,6 +254,12 @@ func main() {
 	}
 
 	downloadAllConfigs(creds)
+
+	// Back up the existing kubeconfig before the merge modifies it, so a bad
+	// merge is always recoverable.
+	if _, err := kubeconfig.BackupConfig(backupCount); err != nil {
+		errorLogger.Fatalf("%s Failed to back up kubeconfig: %v", iso8601Time(), err)
+	}
 
 	if err := kubeconfig.MergeConfigs(); err != nil {
 		errorLogger.Fatalf("%s Failed to merge kubeconfig files: %v", iso8601Time(), err)

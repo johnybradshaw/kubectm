@@ -48,6 +48,7 @@ kubectm is a CLI tool that downloads and merges Kubernetes configurations from c
   - `linode.go` - Calls Linode API (`/lke/clusters` and `/lke/clusters/{id}/kubeconfig`) to fetch kubeconfigs
   - `aws.go` - Downloads EKS kubeconfigs: auto-discovers regions via EC2 DescribeRegions, lists/describes EKS clusters in parallel, generates exec-based kubeconfigs using `aws eks get-token`
   - `merge.go` - Merges `.yaml` files from `~/.kube/` into the main config, handles context naming conflicts, adds Aptakube extension for Linode icon
+  - `backup.go` - Backs up `~/.kube/config` to `~/.kube/config.bak.{timestamp}` before merge; prunes old backups (keeps last N, default 5)
   - `rename.go` - Stub for renaming clusters and contexts in kubeconfig files
   - `lke.png` - Embedded Linode icon (via `//go:embed`)
 
@@ -60,7 +61,8 @@ kubectm is a CLI tool that downloads and merges Kubernetes configurations from c
 1. On first run: discover all available credentials → prompt user to select → save selection to `~/.kubectm/selected_providers.json`
 2. On subsequent runs: load saved provider selection → retrieve credentials for those providers
 3. For each provider: download kubeconfigs to `~/.kube/{label}-kubeconfig.yaml`
-4. Merge all `.yaml` files into `~/.kube/config`, then delete the temporary files
+4. Back up the existing `~/.kube/config` to `~/.kube/config.bak.{timestamp}` (keeping the last N backups)
+5. Merge all `.yaml` files into `~/.kube/config`, then delete the temporary files
 
 ### Linode API Integration
 
@@ -103,6 +105,7 @@ Authentication via static credentials from the discovered `Credential.Details` (
 - `-h, --help`: Show help message
 - `-v, --version`: Show version
 - `--reset-creds`: Reset stored credentials and prompt for new ones
+- `--backup-count <n>`: Number of kubeconfig backups to keep (default: 5)
 
 ## Release Process
 

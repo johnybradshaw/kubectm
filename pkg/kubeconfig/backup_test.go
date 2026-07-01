@@ -163,7 +163,8 @@ func TestBackupConfigKeepClampedToOne(t *testing.T) {
 }
 
 // TestBackupConfigLeavesOtherFilesAlone verifies pruning only touches
-// config.bak.* files, not the main config or temporary kubeconfig files.
+// timestamped config.bak.* files, not the main config, temporary kubeconfig
+// files, or manually created backups without a valid timestamp suffix.
 func TestBackupConfigLeavesOtherFilesAlone(t *testing.T) {
 	kubeDir := setupBackupTestHome(t)
 	writeTestConfig(t, kubeDir)
@@ -171,6 +172,11 @@ func TestBackupConfigLeavesOtherFilesAlone(t *testing.T) {
 	otherFile := filepath.Join(kubeDir, "my-cluster-kubeconfig.yaml")
 	if err := os.WriteFile(otherFile, []byte("temp kubeconfig"), 0600); err != nil {
 		t.Fatalf("failed to create temp kubeconfig: %v", err)
+	}
+
+	manualBackup := filepath.Join(kubeDir, "config.bak.manual")
+	if err := os.WriteFile(manualBackup, []byte("manual backup"), 0600); err != nil {
+		t.Fatalf("failed to create manual backup: %v", err)
 	}
 
 	if _, err := BackupConfig(1); err != nil {
@@ -182,5 +188,8 @@ func TestBackupConfigLeavesOtherFilesAlone(t *testing.T) {
 	}
 	if _, err := os.Stat(otherFile); err != nil {
 		t.Errorf("expected temporary kubeconfig to be untouched: %v", err)
+	}
+	if _, err := os.Stat(manualBackup); err != nil {
+		t.Errorf("expected manual backup to be untouched: %v", err)
 	}
 }

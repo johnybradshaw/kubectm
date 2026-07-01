@@ -16,6 +16,10 @@ const DefaultBackupCount = 5
 // backupPrefix is the filename prefix used for kubeconfig backups in ~/.kube/.
 const backupPrefix = "config.bak."
 
+// backupTimestampFormat is the compact ISO 8601 layout used in backup
+// filenames (no colons, so the name is valid on Windows too).
+const backupTimestampFormat = "20060102T150405Z"
+
 // BackupConfig copies ~/.kube/config to ~/.kube/config.bak.{timestamp} so the
 // user can recover the previous state if a merge goes wrong. After creating
 // the backup it prunes older backups, keeping only the most recent `keep`
@@ -29,7 +33,7 @@ func BackupConfig(keep int) (string, error) {
         return "", err
     }
 
-    if !strings.HasPrefix(kubeDir, homeDir) {
+    if rel, relErr := filepath.Rel(homeDir, kubeDir); relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
         return "", fmt.Errorf("invalid kubeconfig directory outside user home: %s", kubeDir)
     }
 
@@ -47,8 +51,7 @@ func BackupConfig(keep int) (string, error) {
         return "", fmt.Errorf("failed to read kubeconfig for backup: %v", err)
     }
 
-    // Compact ISO 8601 (no colons) so the filename is valid on Windows too.
-    timestamp := time.Now().UTC().Format("20060102T150405Z")
+    timestamp := time.Now().UTC().Format(backupTimestampFormat)
     backupPath := filepath.Clean(filepath.Join(kubeDir, backupPrefix+timestamp))
     if !strings.HasPrefix(backupPath, kubeDir) {
         return "", fmt.Errorf("invalid backup path outside .kube directory: %s", backupPath)
@@ -82,6 +85,12 @@ func pruneBackups(kubeDir string, keep int) error {
     var backups []string
     for _, entry := range entries {
         if entry.IsDir() || !strings.HasPrefix(entry.Name(), backupPrefix) {
+            continue
+        }
+        // Only prune files whose suffix is a timestamp we generated, so
+        // manually created backups like config.bak.before-upgrade survive.
+        timestampPart := strings.TrimPrefix(entry.Name(), backupPrefix)
+        if _, err := time.Parse(backupTimestampFormat, timestampPart); err != nil {
             continue
         }
         backups = append(backups, entry.Name())

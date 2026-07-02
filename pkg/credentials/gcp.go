@@ -73,8 +73,19 @@ func retrieveGCPCredentials() (*Credential, error) {
 // no credentials file is found.
 func findGCPCredentialsFile() (path, source string, err error) {
 	if envPath := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"); envPath != "" {
-		if _, statErr := os.Stat(envPath); statErr != nil {
+		// The env var names a credentials file by contract. Normalise the
+		// path and require a regular file so it cannot name devices,
+		// directories or other special files.
+		envPath, err := filepath.Abs(filepath.Clean(envPath))
+		if err != nil {
+			return "", "", fmt.Errorf("invalid GOOGLE_APPLICATION_CREDENTIALS path: %v", err)
+		}
+		info, statErr := os.Stat(envPath)
+		if statErr != nil {
 			return "", "", fmt.Errorf("GOOGLE_APPLICATION_CREDENTIALS points to an unreadable file: %v", statErr)
+		}
+		if !info.Mode().IsRegular() {
+			return "", "", fmt.Errorf("GOOGLE_APPLICATION_CREDENTIALS does not point to a regular file: %s", envPath)
 		}
 		return envPath, "GOOGLE_APPLICATION_CREDENTIALS environment variable", nil
 	}
@@ -85,10 +96,10 @@ func findGCPCredentialsFile() (path, source string, err error) {
 	}
 	homeDir = filepath.Clean(homeDir)
 
-	adcPath := filepath.Clean(filepath.Join(homeDir, ".config", "gcloud", "application_default_credentials.json"))
-	if !strings.HasPrefix(adcPath, homeDir+string(filepath.Separator)) {
-		return "", "", fmt.Errorf("invalid credentials file path")
-	}
+	// The path is built entirely from hardcoded segments joined to the home
+	// directory, so no traversal check is needed (and a prefix check would
+	// break when HOME is "/").
+	adcPath := filepath.Join(homeDir, ".config", "gcloud", "application_default_credentials.json")
 	if _, statErr := os.Stat(adcPath); statErr != nil {
 		if os.IsNotExist(statErr) {
 			return "", "", nil
@@ -124,10 +135,7 @@ func gcloudActiveProject() string {
 	}
 	homeDir = filepath.Clean(homeDir)
 
-	configPath := filepath.Clean(filepath.Join(homeDir, ".config", "gcloud", "configurations", "config_default"))
-	if !strings.HasPrefix(configPath, homeDir+string(filepath.Separator)) {
-		return ""
-	}
+	configPath := filepath.Join(homeDir, ".config", "gcloud", "configurations", "config_default")
 
 	content, err := os.ReadFile(configPath)
 	if err != nil {

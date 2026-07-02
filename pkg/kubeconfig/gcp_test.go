@@ -19,8 +19,9 @@ import (
 )
 
 // testServiceAccountJSON builds a service account key JSON with a freshly
-// generated RSA key and the given token endpoint.
-func testServiceAccountJSON(t *testing.T, tokenURL string) string {
+// generated RSA key. Token requests go to googleTokenURL, which
+// newTokenServer points at a mock server.
+func testServiceAccountJSON(t *testing.T) string {
 	t.Helper()
 
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -38,7 +39,6 @@ func testServiceAccountJSON(t *testing.T, tokenURL string) string {
 		"project_id":   "test-project",
 		"client_email": "svc@test-project.iam.gserviceaccount.com",
 		"private_key":  string(keyPEM),
-		"token_uri":    tokenURL,
 	}
 	data, err := json.Marshal(sa)
 	if err != nil {
@@ -58,10 +58,11 @@ func writeCredsFile(t *testing.T, content string) string {
 }
 
 // newTokenServer returns an httptest server that validates the expected grant
-// type and responds with an access token.
+// type and responds with an access token, and points googleTokenURL at it for
+// the duration of the test.
 func newTokenServer(t *testing.T, wantGrantType string) *httptest.Server {
 	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			t.Errorf("failed to parse token request form: %v", err)
 		}
@@ -77,13 +78,17 @@ func newTokenServer(t *testing.T, wantGrantType string) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"access_token": "test-access-token", "token_type": "Bearer"}`)
 	}))
+	origTokenURL := googleTokenURL
+	googleTokenURL = server.URL
+	t.Cleanup(func() { googleTokenURL = origTokenURL })
+	return server
 }
 
 func TestGetGCPAccessTokenServiceAccount(t *testing.T) {
 	server := newTokenServer(t, "urn:ietf:params:oauth:grant-type:jwt-bearer")
 	defer server.Close()
 
-	credsPath := writeCredsFile(t, testServiceAccountJSON(t, server.URL))
+	credsPath := writeCredsFile(t, testServiceAccountJSON(t))
 
 	token, err := getGCPAccessToken(context.Background(), credsPath)
 	if err != nil {
@@ -98,13 +103,12 @@ func TestGetGCPAccessTokenAuthorizedUser(t *testing.T) {
 	server := newTokenServer(t, "refresh_token")
 	defer server.Close()
 
-	credsPath := writeCredsFile(t, fmt.Sprintf(`{
+	credsPath := writeCredsFile(t, `{
 		"type": "authorized_user",
 		"client_id": "id",
 		"client_secret": "secret",
-		"refresh_token": "refresh",
-		"token_uri": %q
-	}`, server.URL))
+		"refresh_token": "refresh"
+	}`)
 
 	token, err := getGCPAccessToken(context.Background(), credsPath)
 	if err != nil {
@@ -268,7 +272,7 @@ func TestDownloadGCPKubeConfig(t *testing.T) {
 	gkeAPIBaseURL = gkeServer.URL
 	defer func() { gkeAPIBaseURL = origBase }()
 
-	credsPath := writeCredsFile(t, testServiceAccountJSON(t, tokenServer.URL))
+	credsPath := writeCredsFile(t, testServiceAccountJSON(t))
 
 	cred := credentials.Credential{
 		Provider: "GCP",

@@ -34,7 +34,7 @@ func TestListGCPContexts(t *testing.T) {
 	gkeAPIBaseURL = gkeServer.URL
 	defer func() { gkeAPIBaseURL = origBase }()
 
-	credsPath := writeCredsFile(t, testServiceAccountJSON(t, tokenServer.URL))
+	credsPath := writeCredsFile(t, testServiceAccountJSON(t))
 	cred := credentials.Credential{
 		Provider: "GCP",
 		Details: map[string]string{
@@ -117,7 +117,7 @@ users:
 	gkeAPIBaseURL = gkeServer.URL
 	defer func() { gkeAPIBaseURL = origBase }()
 
-	credsPath := writeCredsFile(t, testServiceAccountJSON(t, tokenServer.URL))
+	credsPath := writeCredsFile(t, testServiceAccountJSON(t))
 	creds := []credentials.Credential{{
 		Provider: "GCP",
 		Details: map[string]string{

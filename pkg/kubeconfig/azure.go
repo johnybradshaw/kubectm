@@ -126,8 +126,9 @@ func listAKSClusters(ctx context.Context, token, subscriptionID string) ([]aksCl
 	var allClusters []aksCluster
 	for endpoint != "" {
 		// Follow only pagination links that stay on the management endpoint,
-		// since nextLink comes from the API response and is untrusted.
-		if !strings.HasPrefix(endpoint, azureManagementBaseURL+"/") {
+		// since nextLink comes from the API response and is untrusted. The
+		// comparison is case-insensitive because URL schemes and hosts are.
+		if !strings.HasPrefix(strings.ToLower(endpoint), strings.ToLower(azureManagementBaseURL)+"/") {
 			return nil, fmt.Errorf("refusing to follow pagination link outside management endpoint: %s", endpoint)
 		}
 
@@ -200,8 +201,9 @@ func processAKSCluster(ctx context.Context, token string, cluster aksCluster) er
 // returns the decoded kubeconfig content.
 func getAKSClusterKubeconfig(ctx context.Context, token, clusterID string) (string, error) {
 	// The cluster ID is an ARM resource path from the list response; ensure it
-	// looks like one before interpolating it into a URL.
-	if !strings.HasPrefix(clusterID, "/subscriptions/") {
+	// looks like one before interpolating it into a URL. ARM resource IDs are
+	// case-insensitive.
+	if !strings.HasPrefix(strings.ToLower(clusterID), "/subscriptions/") {
 		return "", fmt.Errorf("unexpected cluster resource ID format: %s", clusterID)
 	}
 

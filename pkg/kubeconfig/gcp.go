@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
@@ -44,12 +45,14 @@ const (
 
 // gcpAuthJSON models the credential fields needed to obtain an OAuth2 access
 // token from either a service account key or gcloud application default
-// credentials (authorized_user).
+// credentials (authorized_user). The token_uri field in the JSON is
+// deliberately ignored: token requests always go to googleTokenURL so a
+// crafted credentials file cannot redirect a signed assertion to an
+// attacker-controlled endpoint.
 type gcpAuthJSON struct {
 	Type         string `json:"type"`
 	ClientEmail  string `json:"client_email"`
 	PrivateKey   string `json:"private_key"`
-	TokenURI     string `json:"token_uri"`
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 	RefreshToken string `json:"refresh_token"`
@@ -230,6 +233,21 @@ func generateGKEKubeconfig(cluster gkeCluster) string {
 // gcloud application default credentials (authorized_user) use the refresh
 // token grant.
 func getGCPAccessToken(ctx context.Context, credsFile string) (string, error) {
+	// The path originates from the GOOGLE_APPLICATION_CREDENTIALS contract.
+	// Normalise it and require a regular file so it cannot name devices,
+	// directories or other special files.
+	credsFile, err := filepath.Abs(filepath.Clean(credsFile))
+	if err != nil {
+		return "", fmt.Errorf("invalid credentials file path: %v", err)
+	}
+	info, err := os.Stat(credsFile)
+	if err != nil {
+		return "", fmt.Errorf("error reading credentials file: %v", err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("credentials file is not a regular file: %s", credsFile)
+	}
+
 	data, err := os.ReadFile(credsFile)
 	if err != nil {
 		return "", fmt.Errorf("error reading credentials file: %v", err)
@@ -258,10 +276,7 @@ func serviceAccountAccessToken(ctx context.Context, auth gcpAuthJSON) (string, e
 		return "", fmt.Errorf("service account key is missing client_email or private_key")
 	}
 
-	tokenURL := auth.TokenURI
-	if tokenURL == "" {
-		tokenURL = googleTokenURL
-	}
+	tokenURL := googleTokenURL
 
 	assertion, err := signServiceAccountJWT(auth, tokenURL, time.Now())
 	if err != nil {
@@ -282,10 +297,7 @@ func authorizedUserAccessToken(ctx context.Context, auth gcpAuthJSON) (string, e
 		return "", fmt.Errorf("authorized_user credentials are missing client_id, client_secret or refresh_token")
 	}
 
-	tokenURL := auth.TokenURI
-	if tokenURL == "" {
-		tokenURL = googleTokenURL
-	}
+	tokenURL := googleTokenURL
 
 	form := url.Values{
 		"grant_type":    {"refresh_token"},

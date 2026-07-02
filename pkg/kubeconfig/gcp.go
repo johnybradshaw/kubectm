@@ -248,7 +248,7 @@ func getGCPAccessToken(ctx context.Context, credsFile string) (string, error) {
 		return "", fmt.Errorf("credentials file is not a regular file: %s", credsFile)
 	}
 
-	data, err := os.ReadFile(credsFile)
+	data, err := os.ReadFile(filepath.Clean(credsFile))
 	if err != nil {
 		return "", fmt.Errorf("error reading credentials file: %v", err)
 	}

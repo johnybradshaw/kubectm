@@ -86,7 +86,7 @@ func azureCLIDefaultSubscription() (string, error) {
 		return "", fmt.Errorf("invalid Azure profile path")
 	}
 
-	data, err := os.ReadFile(profilePath)
+	data, err := os.ReadFile(filepath.Clean(profilePath))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", nil

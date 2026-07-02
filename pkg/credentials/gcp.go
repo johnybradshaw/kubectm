@@ -35,7 +35,7 @@ func retrieveGCPCredentials() (*Credential, error) {
 		return nil, nil
 	}
 
-	data, err := os.ReadFile(credsPath)
+	data, err := os.ReadFile(filepath.Clean(credsPath))
 	if err != nil {
 		return nil, fmt.Errorf("error reading GCP credentials file %s: %v", credsPath, err)
 	}
@@ -152,7 +152,7 @@ func gcloudActiveProject() string {
 		return ""
 	}
 
-	content, err := os.ReadFile(configPath)
+	content, err := os.ReadFile(filepath.Clean(configPath))
 	if err != nil {
 		return ""
 	}

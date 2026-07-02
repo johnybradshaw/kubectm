@@ -75,10 +75,16 @@ func azureCLIDefaultSubscription() (string, error) {
 	}
 	homeDir = filepath.Clean(homeDir)
 
-	// The path is built entirely from hardcoded segments joined to the home
-	// directory, so no traversal check is needed (and a prefix check would
-	// break when HOME is "/").
+	// Contain the profile path to the home directory. The prefix only gains
+	// a separator when it lacks one, so a home directory of "/" still works.
+	homePrefix := homeDir
+	if !strings.HasSuffix(homePrefix, string(filepath.Separator)) {
+		homePrefix += string(filepath.Separator)
+	}
 	profilePath := filepath.Join(homeDir, ".azure", "azureProfile.json")
+	if !strings.HasPrefix(profilePath, homePrefix) {
+		return "", fmt.Errorf("invalid Azure profile path")
+	}
 
 	data, err := os.ReadFile(profilePath)
 	if err != nil {

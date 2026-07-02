@@ -96,10 +96,16 @@ func findGCPCredentialsFile() (path, source string, err error) {
 	}
 	homeDir = filepath.Clean(homeDir)
 
-	// The path is built entirely from hardcoded segments joined to the home
-	// directory, so no traversal check is needed (and a prefix check would
-	// break when HOME is "/").
+	// Contain the ADC path to the home directory. The prefix only gains a
+	// separator when it lacks one, so a home directory of "/" still works.
+	homePrefix := homeDir
+	if !strings.HasSuffix(homePrefix, string(filepath.Separator)) {
+		homePrefix += string(filepath.Separator)
+	}
 	adcPath := filepath.Join(homeDir, ".config", "gcloud", "application_default_credentials.json")
+	if !strings.HasPrefix(adcPath, homePrefix) {
+		return "", "", fmt.Errorf("invalid credentials file path")
+	}
 	if _, statErr := os.Stat(adcPath); statErr != nil {
 		if os.IsNotExist(statErr) {
 			return "", "", nil
@@ -135,7 +141,16 @@ func gcloudActiveProject() string {
 	}
 	homeDir = filepath.Clean(homeDir)
 
+	// Contain the config path to the home directory. The prefix only gains a
+	// separator when it lacks one, so a home directory of "/" still works.
+	homePrefix := homeDir
+	if !strings.HasSuffix(homePrefix, string(filepath.Separator)) {
+		homePrefix += string(filepath.Separator)
+	}
 	configPath := filepath.Join(homeDir, ".config", "gcloud", "configurations", "config_default")
+	if !strings.HasPrefix(configPath, homePrefix) {
+		return ""
+	}
 
 	content, err := os.ReadFile(configPath)
 	if err != nil {

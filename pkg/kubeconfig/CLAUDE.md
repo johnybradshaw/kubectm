@@ -12,10 +12,12 @@ Downloads kubeconfigs from cloud provider APIs and merges them into `~/.kube/con
 | `linode.go` | Calls Linode API v4 to fetch LKE cluster kubeconfigs |
 | `aws.go` | Downloads EKS kubeconfigs via AWS SDK v2 (EC2 DescribeRegions, EKS ListClusters/DescribeCluster) with parallel region scanning, exec-based auth, and optional config override |
 | `merge.go` | Merges `.yaml` files from `~/.kube/` into main config |
+| `backup.go` | Backs up `~/.kube/config` to `config.bak.{timestamp}` before merge; prunes old backups keeping the most recent N (default 5) |
 | `rename.go` | Stub for renaming clusters/contexts in kubeconfigs |
 | `lke.png` | Embedded Linode icon for Aptakube extension (`//go:embed`) |
 | `linode_test.go` | Tests for Linode kubeconfig download |
 | `aws_test.go` | Tests for AWS EKS kubeconfig download (13 cases with httptest mock servers) |
+| `backup_test.go` | Tests for kubeconfig backup and pruning |
 
 ## Dependencies
 

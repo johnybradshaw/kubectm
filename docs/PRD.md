@@ -41,6 +41,7 @@ Run `kubectm` once and your kubeconfig is current across every provider.
 | Cross-platform builds | Done | Linux/macOS/Windows x amd64/arm64, GPG signed, attested |
 | Path traversal protection | Done | File operations validated within `~/.kube/` |
 | Credential obfuscation | Done | Sensitive values masked in log output |
+| Backup before merge | Done | `~/.kube/config` copied to `config.bak.{timestamp}` before merge; last N kept (`--backup-count`, default 5) |
 
 ### What's Stubbed or Missing
 
@@ -53,7 +54,6 @@ Run `kubectm` once and your kubeconfig is current across every provider.
 | GCP kubeconfig download | Not started | — |
 | Context/cluster renaming | Stub | `RenameConfigs()` logs and returns nil |
 | Dry-run mode | Not started | No way to preview without modifying config |
-| Backup before merge | Not started | No backup of existing `~/.kube/config` |
 
 ## 4. Target Providers
 

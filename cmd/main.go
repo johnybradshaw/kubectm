@@ -46,6 +46,8 @@ Options:
   -v, --version       Show the version of kubectm.
   --reset-creds       Reset the stored credentials and prompt for new ones.
   --backup-count <n>  Number of kubeconfig backups to keep (default: 5).
+  --dry-run           List available clusters and show what would change
+                      without modifying any files.
 
 For more information and source code, visit:
 https://github.com/johnybradshaw/kubectm
@@ -221,6 +223,7 @@ func main() {
 	var showVersion bool
 	var resetCreds bool
 	var backupCount int
+	var dryRun bool
 
 	flag.BoolVar(&showHelp, "help", false, "Show help message")
 	flag.BoolVar(&showHelp, "h", false, "Show help message")
@@ -228,6 +231,7 @@ func main() {
 	flag.BoolVar(&showVersion, "v", false, "Show version information")
 	flag.BoolVar(&resetCreds, "reset-creds", false, "Reset stored credentials and prompt for new ones")
 	flag.IntVar(&backupCount, "backup-count", kubeconfig.DefaultBackupCount, "Number of kubeconfig backups to keep")
+	flag.BoolVar(&dryRun, "dry-run", false, "Show what would change without modifying any files")
 	flag.Parse()
 
 	if showHelp {
@@ -251,6 +255,13 @@ func main() {
 	creds, err := credentials.RetrieveSelected(selectedProviders)
 	if err != nil {
 		errorLogger.Fatalf("%s Failed to retrieve selected credentials: %v", iso8601Time(), err)
+	}
+
+	if dryRun {
+		if err := kubeconfig.DryRunConfigs(creds); err != nil {
+			errorLogger.Fatalf("%s Dry-run failed: %v", iso8601Time(), err)
+		}
+		return
 	}
 
 	downloadAllConfigs(creds)

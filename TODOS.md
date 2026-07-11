@@ -10,6 +10,18 @@
 
 ## Completed
 
+### P0: GCP GKE provider (credential discovery + kubeconfig download)
+**What:** Discover GCP credentials (`GOOGLE_APPLICATION_CREDENTIALS` or gcloud ADC, project from env/JSON/gcloud config) and download GKE kubeconfigs via the GKE REST API with `gke-gcloud-auth-plugin` exec auth. OAuth tokens obtained directly (service-account JWT grant, authorized-user refresh grant) — no new dependencies.
+**Completed:** 2026-07-02
+
+### P0: Azure AKS provider (credential discovery + kubeconfig download)
+**What:** Discover Azure service principal credentials (env vars, subscription from env or `~/.azure/azureProfile.json`) and download AKS kubeconfigs via ARM (`managedClusters` list + `listClusterUserCredential`) using the client-credentials grant — no new dependencies.
+**Completed:** 2026-07-02
+
+### P2: Dry-run mode
+**What:** `kubectm --dry-run` lists clusters from each selected provider and reports which contexts would be added or refreshed in `~/.kube/config`, then exits without modifying any files (PRD §5.4).
+**Completed:** 2026-07-02
+
 ### P1: Backup before merge
 **What:** Back up `~/.kube/config` to `~/.kube/config.bak.{timestamp}` before the merge modifies it, keep the last N backups (configurable via `--backup-count`, default 5), and log the backup path.
 **Why:** A bad merge previously destroyed the existing kubeconfig with no way to recover (PRD §5.3).

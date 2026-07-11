@@ -21,6 +21,16 @@ func DownloadConfigs(creds []credentials.Credential) error {
             if err != nil {
                 return fmt.Errorf("error downloading AWS EKS kubeconfig: %v", err)
             }
+        case "GCP":
+            err := downloadGCPKubeConfig(cred)
+            if err != nil {
+                return fmt.Errorf("error downloading GCP GKE kubeconfig: %v", err)
+            }
+        case "Azure":
+            err := downloadAzureKubeConfig(cred)
+            if err != nil {
+                return fmt.Errorf("error downloading Azure AKS kubeconfig: %v", err)
+            }
         default:
             // Print a message to the user if the provider is not supported
             fmt.Printf("Provider %s is not supported yet\n", cred.Provider)

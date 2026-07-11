@@ -42,18 +42,17 @@ Run `kubectm` once and your kubeconfig is current across every provider.
 | Path traversal protection | Done | File operations validated within `~/.kube/` |
 | Credential obfuscation | Done | Sensitive values masked in log output |
 | Backup before merge | Done | `~/.kube/config` copied to `config.bak.{timestamp}` before merge; last N kept (`--backup-count`, default 5) |
+| GCP credential discovery | Done | `GOOGLE_APPLICATION_CREDENTIALS` env var or gcloud ADC; project from env, JSON, or gcloud config |
+| GCP kubeconfig download | Done | GKE REST API; exec auth via `gke-gcloud-auth-plugin`; contexts `{name}@{location}` |
+| Azure credential discovery | Done | Service principal env vars; subscription from env or `~/.azure/azureProfile.json` |
+| Azure kubeconfig download | Done | ARM `managedClusters` + `listClusterUserCredential`; contexts `{name}@{resource-group}` |
+| Dry-run mode | Done | `--dry-run` lists clusters and reports changes without modifying files |
 
 ### What's Stubbed or Missing
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| AWS kubeconfig download | Stub | Credentials discovered but no EKS API integration |
-| Azure credential discovery | Stub | Returns `nil, nil` |
-| Azure kubeconfig download | Not started | — |
-| GCP credential discovery | Stub | Returns `nil, nil` |
-| GCP kubeconfig download | Not started | — |
 | Context/cluster renaming | Stub | `RenameConfigs()` logs and returns nil |
-| Dry-run mode | Not started | No way to preview without modifying config |
 
 ## 4. Target Providers
 

@@ -12,9 +12,11 @@ Discovers and retrieves cloud provider credentials from environment variables an
 | `retrieve_test.go` | Tests for logCredentialDiscovery helper |
 | `linode.go` | Reads `LINODE_ACCESS_TOKEN` env var or `~/.config/linode-cli` |
 | `aws.go` | Reads `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` env vars or `~/.aws/credentials` |
-| `azure.go` | Stub — not yet implemented |
-| `gcp.go` | Stub — not yet implemented |
+| `azure.go` | Reads `AZURE_CLIENT_ID`/`AZURE_CLIENT_SECRET`/`AZURE_TENANT_ID` env vars; subscription from `AZURE_SUBSCRIPTION_ID` or `~/.azure/azureProfile.json` |
+| `gcp.go` | Reads `GOOGLE_APPLICATION_CREDENTIALS` env var or gcloud ADC; project from `GOOGLE_CLOUD_PROJECT`, credentials JSON, or gcloud active config |
 | `aws_test.go` | Tests for AWS credential retrieval |
+| `azure_test.go` | Tests for Azure credential retrieval |
+| `gcp_test.go` | Tests for GCP credential retrieval |
 
 ## Dependencies
 

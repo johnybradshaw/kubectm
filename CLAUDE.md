@@ -41,12 +41,16 @@ kubectm is a CLI tool that downloads and merges Kubernetes configurations from c
   - `retrieve.go` - Central dispatcher with `RetrieveAll()` and `RetrieveSelected()` functions; includes `logCredentialDiscovery()` helper for obfuscated logging
   - `linode.go` - Reads from `LINODE_ACCESS_TOKEN` env var or `~/.config/linode-cli` config file
   - `aws.go` - Reads from `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` env vars or `~/.aws/credentials` file
-  - `azure.go`, `gcp.go` - Stub implementations (not yet functional)
+  - `gcp.go` - Reads `GOOGLE_APPLICATION_CREDENTIALS` env var or gcloud ADC file; project from `GOOGLE_CLOUD_PROJECT`, credentials JSON, or gcloud active config
+  - `azure.go` - Reads `AZURE_CLIENT_ID`/`AZURE_CLIENT_SECRET`/`AZURE_TENANT_ID` env vars; subscription from `AZURE_SUBSCRIPTION_ID` or `~/.azure/azureProfile.json`
 
 - **pkg/kubeconfig/** - Kubeconfig operations
   - `download.go` - Dispatcher that routes to provider-specific downloaders (Linode, AWS)
   - `linode.go` - Calls Linode API (`/lke/clusters` and `/lke/clusters/{id}/kubeconfig`) to fetch kubeconfigs
   - `aws.go` - Downloads EKS kubeconfigs: auto-discovers regions via EC2 DescribeRegions, lists/describes EKS clusters in parallel, generates exec-based kubeconfigs using `aws eks get-token`
+  - `gcp.go` - Downloads GKE kubeconfigs via the GKE REST API; OAuth tokens obtained directly (service-account JWT grant or authorized-user refresh grant); generates exec-based kubeconfigs using `gke-gcloud-auth-plugin`
+  - `azure.go` - Downloads AKS kubeconfigs via Azure Resource Manager (client-credentials token, `managedClusters` list, `listClusterUserCredential`)
+  - `dryrun.go` - `--dry-run` support: lists clusters per provider and reports what a merge would change without writing files
   - `merge.go` - Merges `.yaml` files from `~/.kube/` into the main config, handles context naming conflicts, adds Aptakube extension for Linode icon
   - `backup.go` - Backs up `~/.kube/config` to `~/.kube/config.bak.{timestamp}` before merge; prunes old backups (keeps last N, default 5)
   - `rename.go` - Stub for renaming clusters and contexts in kubeconfig files
@@ -83,6 +87,21 @@ Regions are scanned in parallel (concurrency=5, 30s timeout). Generated kubeconf
 
 Authentication via static credentials from the discovered `Credential.Details` (AccessKey, SecretKey, optional SessionToken).
 
+### GCP GKE Integration
+
+The GCP provider uses the GKE REST API (`https://container.googleapis.com/v1`):
+- `GET /projects/{projectID}/locations/-/clusters` - List clusters across all locations
+
+OAuth2 access tokens are obtained without SDK dependencies: service account keys use the signed-JWT bearer grant against the key's `token_uri`; gcloud application default credentials use the refresh-token grant. Generated kubeconfigs use the `gke-gcloud-auth-plugin` exec plugin. Context naming: `{cluster-name}@{location}`.
+
+### Azure AKS Integration
+
+The Azure provider uses Azure Resource Manager (`https://management.azure.com`):
+- `GET /subscriptions/{sub}/providers/Microsoft.ContainerService/managedClusters` - List AKS clusters (with `nextLink` pagination)
+- `POST {clusterId}/listClusterUserCredential` - Get the cluster's kubeconfig (base64, written directly like Linode)
+
+Authentication via the OAuth2 client-credentials grant against Microsoft Entra ID (`https://login.microsoftonline.com`). Context naming: `{cluster-name}@{resource-group}`.
+
 ## Key Dependencies
 
 - `k8s.io/client-go` - Kubernetes client library for kubeconfig handling
@@ -106,6 +125,7 @@ Authentication via static credentials from the discovered `Credential.Details` (
 - `-v, --version`: Show version
 - `--reset-creds`: Reset stored credentials and prompt for new ones
 - `--backup-count <n>`: Number of kubeconfig backups to keep (default: 5)
+- `--dry-run`: List available clusters and show what would change without modifying any files
 
 ## Release Process
 

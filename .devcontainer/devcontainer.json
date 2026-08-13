@@ -1,0 +1,27 @@
+{
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "davidanson.vscode-markdownlint",
+        "esbenp.prettier-vscode",
+        "mikestead.dotenv",
+        "redhat.vscode-yaml",
+        "usernamehw.errorlens",
+        "golang.go"
+      ],
+      "settings": {}
+    }
+  },
+  "image": "mcr.microsoft.com/devcontainers/go:1.26-bookworm",
+  "name": "kubectm",
+  "postCreateCommand": "go mod download",
+  "remoteEnv": {
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
+    "OP_SERVICE_ACCOUNT_TOKEN": "${localEnv:OP_SERVICE_ACCOUNT_TOKEN}"
+  },
+  "mounts": [
+    "type=bind,source=${localEnv:HOME}/.kube/config,target=/home/vscode/.kube/config",
+    "type=bind,source=${localEnv:HOME}/.aws,target=/home/vscode/.aws"
+  ]
+}

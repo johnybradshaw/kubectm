@@ -1,4 +1,4 @@
-# CLAUDE.md — kubeconfig Module
+# AGENTS.md — kubeconfig Module
 
 ## Module Purpose
 

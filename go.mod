@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.26
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.2
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.322.0
-	github.com/aws/aws-sdk-go-v2/service/eks v1.88.0
+	github.com/aws/aws-sdk-go-v2/service/eks v1.96.0
 	github.com/fatih/color v1.19.0
 	k8s.io/apimachinery v0.36.4
 	k8s.io/client-go v0.36.4
